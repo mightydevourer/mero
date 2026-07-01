@@ -1,0 +1,160 @@
+import * as THREE from '../vendor/three.module.js';
+import { PAL } from './util.js';
+
+// Combat is secondary and must never interrupt motion: hold to fire, big
+// aim-assist cone, no reloads, no self-damage. The blast doubles as the
+// rocket-jump.
+
+const BULLET_SPEED = 130;
+const BLAST_SPEED = 52;
+const AIM_CONE = 0.994;   // ~6 degrees
+const _v = new THREE.Vector3();
+const _m = new THREE.Vector3();
+
+export class Combat {
+  constructor(scene, world, player, effects, emit) {
+    this.scene = scene;
+    this.world = world;
+    this.player = player;
+    this.fx = effects;
+    this.emit = emit;
+    this.bullets = [];
+    this.pool = [];
+    this.fireTimer = 0;
+    this.blastCooldown = 0;
+    this.score = 0;
+  }
+
+  _getBullet(big) {
+    let b = this.pool.pop();
+    if (!b) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 10, 8),
+        new THREE.MeshBasicMaterial({ color: PAL.magenta, toneMapped: false }),
+      );
+      this.scene.add(mesh);
+      b = { mesh, pos: new THREE.Vector3(), vel: new THREE.Vector3(), life: 0, blast: false };
+    }
+    b.mesh.visible = true;
+    b.mesh.scale.setScalar(big ? 0.42 : 0.14);
+    b.mesh.material.color.setHex(big ? PAL.gold : PAL.magenta);
+    return b;
+  }
+
+  // steer the shot toward the nearest target within the assist cone
+  assist(origin, dir) {
+    let best = null, bestDot = AIM_CONE;
+    for (const t of this.world.targets) {
+      if (!t.alive) continue;
+      _v.copy(t.mesh ? t.mesh.position : t.base).sub(origin);
+      const d = _v.length();
+      if (d < 2 || d > 130) continue;
+      _v.divideScalar(d);
+      const dot = _v.dot(dir);
+      if (dot > bestDot) { bestDot = dot; best = t; }
+    }
+    if (best) {
+      _v.copy(best.mesh ? best.mesh.position : best.base).sub(origin).normalize();
+      return _v.clone();
+    }
+    return dir.clone();
+  }
+
+  fire(muzzle, aim) {
+    const dir = this.assist(aim.origin, aim.dir);
+    const b = this._getBullet(false);
+    b.pos.copy(muzzle);
+    b.vel.copy(dir).multiplyScalar(BULLET_SPEED);
+    b.life = 1.2;
+    b.blast = false;
+    b.mesh.position.copy(b.pos);
+    this.bullets.push(b);
+    this.fx.burst(muzzle, { color: PAL.magenta, count: 3, speed: 2, life: 0.15, size: 6, up: 0, spread: 0.1, gravity: 0 });
+    this.emit('shoot', {});
+  }
+
+  fireBlast(muzzle, aim) {
+    const b = this._getBullet(true);
+    b.pos.copy(muzzle);
+    b.vel.copy(aim.dir).multiplyScalar(BLAST_SPEED);
+    b.life = 1.4;
+    b.blast = true;
+    b.mesh.position.copy(b.pos);
+    this.bullets.push(b);
+    this.emit('blast_fire', {});
+  }
+
+  explode(pos) {
+    this.fx.ring(pos, PAL.gold, 9, 0.5);
+    this.fx.burst(pos, { color: PAL.gold, count: 26, speed: 10, life: 0.55, size: 9, up: 5, spread: 0.6, gravity: 14 });
+    this.fx.burst(pos, { color: PAL.coral, count: 14, speed: 7, life: 0.4, size: 7, up: 3, spread: 0.4, gravity: 10 });
+    // knockback launches, never hurts (and pops targets caught in it)
+    this.player.applyBlast(pos, 8.5, 21);
+    for (const t of this.world.targets) {
+      if (t.alive && t.mesh && t.mesh.position.distanceTo(pos) < 7) this.popTarget(t);
+    }
+    this.emit('blast_hit', { pos: pos.clone() });
+  }
+
+  popTarget(t) {
+    this.world.popTarget(t, this.player.t);
+    const p = t.mesh ? t.mesh.position : t.base;
+    this.fx.ring(p, PAL.teal, 4, 0.35);
+    this.fx.burst(p, { color: PAL.teal, count: 18, speed: 8, life: 0.5, size: 8, up: 4, spread: 0.3, gravity: 8 });
+    this.fx.burst(p, { color: PAL.cream, count: 8, speed: 5, life: 0.4, size: 6, up: 3, spread: 0.3, gravity: 6 });
+    this.score++;
+    this.emit('target_hit', { pos: p.clone ? p.clone() : p, score: this.score });
+  }
+
+  update(dt, inp, muzzle, aim) {
+    this.fireTimer -= dt;
+    this.blastCooldown -= dt;
+    if (inp.shootHeld && this.fireTimer <= 0) {
+      this.fireTimer = 0.16;
+      this.fire(muzzle, aim);
+    }
+    if (inp.blast && this.blastCooldown <= 0) {
+      this.blastCooldown = 0.85;
+      this.fireBlast(muzzle, aim);
+    }
+
+    for (let i = this.bullets.length - 1; i >= 0; i--) {
+      const b = this.bullets[i];
+      const step = Math.min(dt, b.life);
+      b.life -= dt;
+      _v.copy(b.vel).multiplyScalar(step);
+      const stepLen = _v.length();
+      _m.copy(_v).normalize();
+
+      let hitAt = null;
+      // world hit
+      const wHit = this.world.raycast(b.pos, _m, stepLen);
+      if (wHit) hitAt = wHit.point;
+      // target hit (segment vs sphere, generous radius)
+      let hitTarget = null;
+      for (const t of this.world.targets) {
+        if (!t.alive || !t.mesh) continue;
+        const tp = t.mesh.position;
+        const toT = _v.set(tp.x - b.pos.x, tp.y - b.pos.y, tp.z - b.pos.z);
+        const along = toT.dot(_m);
+        if (along < -t.r || along > stepLen + t.r) continue;
+        const closest2 = toT.lengthSq() - along * along;
+        if (closest2 < t.r * t.r) { hitTarget = t; hitAt = tp.clone(); break; }
+      }
+
+      if (hitTarget && !b.blast) this.popTarget(hitTarget);
+      if (hitAt || b.life <= 0) {
+        if (b.blast) this.explode(hitAt || b.pos);
+        else if (hitAt && !hitTarget) {
+          this.fx.burst(hitAt, { color: PAL.magenta, count: 5, speed: 3, life: 0.25, size: 5, up: 1, spread: 0.1, gravity: 6 });
+        }
+        b.mesh.visible = false;
+        this.pool.push(b);
+        this.bullets.splice(i, 1);
+        continue;
+      }
+      b.pos.addScaledVector(b.vel, step);
+      b.mesh.position.copy(b.pos);
+    }
+  }
+}
