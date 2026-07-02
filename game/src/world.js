@@ -17,7 +17,8 @@ export class World {
     this.scene = scene;
     this.colliders = [];   // {c, h, q, qi, br, mesh, vel, platform, name}
     this.pads = [];        // {pos, dir, power, mesh, lastFire}
-    this.ziplines = [];    // {curve, len, points}
+    this.ziplines = [];    // {curve, len, points, type:'zip'}
+    this.rails = [];       // {curve, len, points, type:'rail'} — grind rails
     this.anchors = [];     // {pos, mesh}  grapple rings
     this.targets = [];     // {base, mesh, alive, respawnAt, r}
     this.platforms = [];   // {col, base, axis, amp, speed, phase}
@@ -122,6 +123,31 @@ export class World {
     }
     this.ziplines.push(zl);
     return zl;
+  }
+
+  // grind rail on the ground: land on it (or run onto it) to grind
+  addRail(pts) {
+    const points = pts.map((p) => new THREE.Vector3(...p));
+    const curve = new THREE.CatmullRomCurve3(points);
+    const rl = {
+      curve, len: curve.getLength(), points: curve.getPoints(64),
+      a: points[0], b: points[points.length - 1], type: 'rail',
+    };
+    if (this.scene) {
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 80, 0.1, 8), glow(PAL.gold));
+      this.scene.add(tube);
+      const rim = new THREE.Mesh(new THREE.TubeGeometry(curve, 80, 0.16, 6), glow(PAL.ink, 0.55));
+      this.scene.add(rim);
+      // support posts
+      for (let i = 1; i < 8; i++) {
+        const p = curve.getPointAt(i / 8);
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 0.8, 6), toon(PAL.ink));
+        post.position.set(p.x, p.y - 0.4, p.z);
+        this.scene.add(post);
+      }
+    }
+    this.rails.push(rl);
+    return rl;
   }
 
   addAnchor(x, y, z) {
@@ -374,6 +400,21 @@ export class World {
 
     // wind back: zipline from B's far edge up is covered; add ring from B to floats
     this.addAnchor(74, 6, -14);
+
+    // === GRIND RAILS ===
+    // plaza sweep: curls around the plaza and launches you at the canyon
+    this.addRail([
+      [-16, 0.55, 20], [-21, 0.55, 4], [-15, 0.55, -14],
+      [-6, 0.55, -30], [-1, 1.4, -44],
+    ]);
+    // hillside line: rides the gap beside the slide hill down to island B
+    this.addRail([
+      [37, 1.0, 1], [50, -5.2, -2], [64, -11.0, -6], [78, -11.0, -13],
+    ]);
+    // lagoon loop: island B's east rim toward the pad staircase
+    this.addRail([
+      [110, -11.45, 26], [114, -11.45, 6], [106, -11.45, -12], [92, -11.45, -20],
+    ]);
   }
 
   // ---------- queries ----------

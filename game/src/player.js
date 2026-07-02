@@ -8,10 +8,10 @@ import { clamp } from './util.js';
 // auto-catches — the forgiveness layer lives here too.
 // ---------------------------------------------------------------------------
 
-// speed model
-const CAP = 40;            // horizontal speed cap
-const RUN = 13;            // speed plain running reaches almost instantly
-const RUN_BUILD_MAX = 19;  // sustained running keeps building to this
+// speed model — tuned for control: a firm cap, modest gains
+const CAP = 22;            // horizontal speed cap
+const RUN = 10;            // speed plain running reaches almost instantly
+const RUN_BUILD_MAX = 12.5; // sustained running keeps building to this
 const GRAV = 26;
 const JUMP_V = 10.6;
 
@@ -66,8 +66,9 @@ export class Player {
     this.poundFling = 0;
     this.climbTime = 0;
     this.mantleCooldown = 0;
-    this.dashCharges = 3;
-    this.dashRecharge = 0;
+    this.dashCharges = 1;      // one dash — no chaining
+    this.dashCooldown = 0;
+    this.grappleQueue = 0;
     this.wallrun = null;          // {n, t, side, timer, contact}
     this.wallCooldownCol = null;
     this.wallCooldown = 0;
@@ -128,9 +129,13 @@ export class Player {
     const d = _a.length();
     if (d > radius) return false;
     const falloff = 1 - (d / radius) * 0.75;
-    _a.y += 0.35; // bias upward: blasts love to launch
+    // superjump bias: a blast below you throws you UP; wall blasts push out+up
+    _a.y += blastPos.y < c.y - 0.3 ? 0.85 : 0.5;
     _a.normalize();
     const tuck = this.crouchHeld ? 1.22 : 1;
+    // the blast owns this moment: kick off whatever you were riding
+    this.wallrun = null;
+    if (this.zip) this.detachZip(true);
     this.vel.addScaledVector(_a, power * falloff * tuck);
     if (this.vel.y > 3) {
       this.grounded = false;
@@ -157,13 +162,9 @@ export class Player {
     this.zipCooldown = Math.max(0, this.zipCooldown - dt);
     this.mantleCooldown = Math.max(0, this.mantleCooldown - dt);
     this.landPulse = Math.max(0, this.landPulse - dt * 4);
+    this.dashCooldown = Math.max(0, this.dashCooldown - dt);
+    this.grappleQueue = Math.max(0, this.grappleQueue - dt);
     this.crouchHeld = inp.crouchHeld;
-
-    // dash recharge (3 pips, one at a time)
-    if (this.dashCharges < 3) {
-      this.dashRecharge += dt;
-      if (this.dashRecharge >= 1.6) { this.dashCharges++; this.dashRecharge = 0; }
-    }
 
     // wish direction in world space from camera yaw
     const wish = _b.set(
@@ -181,15 +182,18 @@ export class Player {
     // --------- grapple input ---------
     this.updateGrapple(dt, inp, aim);
 
-    // --------- dash: the signature move — always adds speed ---------
-    if (inp.dash && this.dashCharges > 0) {
-      this.dashCharges--;
-      this.dashRecharge = 0;
+    // --------- dash: a pure redirect — same speed, new direction ---------
+    // one charge, no chaining; refills on landing / wall / rail / pad
+    if (inp.dash && this.dashCharges > 0 && this.dashCooldown <= 0) {
+      this.dashCharges = 0;
+      this.dashCooldown = 0.9;
       if (this.zip) this.detachZip(false);
       if (this.grapple) this.endGrapple(false);
       this.pound = false;
       const dir = wishMag > 0.1 ? wish : _a.set(Math.sin(camYaw), 0, -Math.cos(camYaw));
-      this.boost(8, dir, 16); // floor 16: a dash from standstill = instantly fast
+      // keep exactly the speed you had (floored at run speed so a standing
+      // dash still moves you — never more than running would)
+      this.boost(0, dir, RUN);
       if (!this.grounded && this.vel.y < 0) this.vel.y = 0; // air dash floats
       this.postJumpGrace = Math.max(this.postJumpGrace, 0.22);
       this.emit('dash', { dir: dir.clone() });
@@ -218,7 +222,7 @@ export class Player {
         this.endGrapple(false);
       } else if (d < 3.2 || this.grapple.timer <= 0) {
         // arrive carrying it all, with a pop so you never bonk to a stop
-        this.vel.y = Math.max(this.vel.y, 4.5);
+        this.vel.y = Math.max(this.vel.y, 3.5);
         this.clampH();
         this.canDoubleJump = true;
         this.emit('grapple_pull_arrive', {});
@@ -241,7 +245,7 @@ export class Player {
       if (this.grapple) this.endGrapple(false);
       this.poundStoredH = this.hspeed();
       this.vel.x *= 0.3; this.vel.z *= 0.3;
-      this.vel.y = Math.min(this.vel.y, -44);
+      this.vel.y = -55; // same hard slam whether you were rising or falling
       this.emit('pound_start', {});
     }
 
@@ -260,7 +264,7 @@ export class Player {
     // --------- gravity ---------
     let g = GRAV * gravScale;
     if (this.wallrun) g *= 0.14;
-    if (this.grapple && this.grapple.mode === 'swing') g *= 1.0;
+    if (this.grapple && this.grapple.mode === 'swing') g *= 0.35; // floaty swings
     this.glide = false;
     if (!this.grounded && !this.wallrun && !this.pound && inp.jumpHeld &&
         this.vel.y < 0 && this.sinceJump > 0.3) {
@@ -270,7 +274,7 @@ export class Player {
     this.wasGliding = this.glide;
     this.vel.y -= g * dt;
     if (this.glide) this.vel.y = Math.max(this.vel.y, lowGrav ? -1.6 : -3.5);
-    this.vel.y = Math.max(this.vel.y, -70);
+    this.vel.y = Math.max(this.vel.y, this.pound ? -85 : -60);
 
     // --------- swing constraint ---------
     if (this.grapple && this.grapple.mode === 'swing') this.updateSwing(dt);
@@ -284,12 +288,13 @@ export class Player {
   tryJump(wish, wishMag, camYaw) {
     const tuck = this.crouchHeld ? 1.16 : 1;
     if (this.wallrun) {
-      // wall-kick: launch off, no speed lost, a little gained
+      // wall-kick: launch off, speed preserved, modest push off the wall
+      // (want more height/distance? blast the wall with Q)
       const w = this.wallrun;
-      const s = Math.max(this.hspeed(), 10);
-      this.vel.x = w.t.x * (s + 2) + w.n.x * 7.5;
-      this.vel.z = w.t.z * (s + 2) + w.n.z * 7.5;
-      this.vel.y = 8.2 * tuck;
+      const s = Math.max(this.hspeed(), 9);
+      this.vel.x = w.t.x * s + w.n.x * 4.5;
+      this.vel.z = w.t.z * s + w.n.z * 4.5;
+      this.vel.y = 7.0 * tuck;
       this.clampH();
       this.wallCooldownCol = w.col;
       this.wallCooldown = 0.55;
@@ -312,13 +317,15 @@ export class Player {
         this.poundFling = 0;
         this.emit('slidehop', {});
       } else if (this.sliding) {
-        this.boost(4, null, 0);
+        this.boost(2, null, 0);
         this.emit('slidehop', {});
-      } else if (this.bhopGrace > 0 && this.hspeed() > RUN * 0.8) {
+      } else if (this.bhopGrace > 0 && this.crouchHeld && this.hspeed() > RUN * 0.8) {
+        // speed gain only for the crouch-bhop; a plain bhop just keeps it all
         this.boost(1.5, null, 0);
         this.emit('bhop', {});
       } else {
-        this.emit('jump', {});
+        if (this.bhopGrace > 0 && this.hspeed() > RUN * 0.8) this.emit('bhop', {});
+        else this.emit('jump', {});
       }
       this.sliding = false;
       this.grounded = false;
@@ -332,8 +339,8 @@ export class Player {
       this.canDoubleJump = false;
       this.vel.y = Math.max(this.vel.y, 9.6 * tuck);
       if (wishMag > 0.1) {
-        // redirect the leap toward where you're steering, keep + gain speed
-        this.boost(2, wish, 8);
+        // redirect the leap toward where you're steering — no speed change
+        this.boost(0, wish, 0);
       }
       this.jumpBuffer = 0;
       this.sinceJump = 0;
@@ -403,6 +410,15 @@ export class Player {
       const ns = Math.max(0, s - 30 * dt);
       if (s > 0.01) { const k = ns / s; this.vel.x *= k; this.vel.z *= k; }
     }
+
+    // run straight at a wall to start climbing it
+    if (wishMag > 0.3 && this.climbTime < 1.2) {
+      const wallC = this.contacts.find((k) => Math.abs(k.n.y) < 0.35);
+      if (wallC) {
+        const into = -(wish.x * wallC.n.x + wish.z * wallC.n.z);
+        if (into > 0.55) this.vel.y = Math.max(this.vel.y, 6);
+      }
+    }
   }
 
   moveAir(dt, inp, wish, wishMag, lowGrav) {
@@ -421,9 +437,13 @@ export class Player {
         if (s2 > RUN) { const k = RUN / s2; this.vel.x *= k; this.vel.z *= k; }
       } else {
         this.steer(wish, rate, dt);
-        // soft, forgiving air-strafe gain — free speed for holding a direction
-        const gain = (lowGrav ? 10 : 6) * dt * wishMag;
-        this.boost(gain, null, 0);
+        // a whisper of air-strafe gain, and only up to cruising pace —
+        // real speed comes from crouch-bhops, slides, and the toys
+        const ceiling = lowGrav ? 18 : RUN_BUILD_MAX + 2;
+        if (s < ceiling) {
+          const gain = Math.min((lowGrav ? 5 : 2) * dt * wishMag, ceiling - s);
+          this.boost(gain, null, 0);
+        }
       }
     }
     // climbing / mantling assists
@@ -440,19 +460,21 @@ export class Player {
     if (into < 0.3) return;
     const c = this.center();
     _a.set(-n.x, -n.y, -n.z);
-    const headFree = !this.world.raycast(_c.set(c.x, this.pos.y + this.height + 0.25, c.z), _a, R + 0.9);
-    const chestHit = this.world.raycast(_c.set(c.x, this.pos.y + this.height * 0.45, c.z), _a, R + 0.9);
+    const headFree = !this.world.raycast(_c.set(c.x, this.pos.y + this.height + 0.25, c.z), _a, R + 1.1);
+    const chestHit = this.world.raycast(_c.set(c.x, this.pos.y + this.height * 0.45, c.z), _a, R + 1.1);
     if (headFree && chestHit) {
-      // ledge just out of reach: pop up and over instead of falling
-      if (this.vel.y < 7.2) {
-        this.vel.y = 7.2;
+      // ledge in reach: mantle up and over instead of falling
+      if (this.vel.y < 8) {
+        this.vel.y = 8;
+        this.vel.x += -n.x * 1.5;
+        this.vel.z += -n.z * 1.5;
         this.mantleCooldown = 0.45;
         this.emit('mantle', {});
       }
-    } else if (!headFree && this.hspeed() < 7 && this.climbTime < 0.85) {
-      // low-speed scramble up short vertical faces
+    } else if (!headFree && this.climbTime < 1.2) {
+      // scramble straight up vertical faces while pushing into them
       this.climbTime += dt;
-      this.vel.y = Math.max(this.vel.y, 5.2);
+      this.vel.y = Math.max(this.vel.y, 6);
     }
   }
 
@@ -478,9 +500,9 @@ export class Player {
       w.n.copy(hug.normal);
       if (hug.dist > R + 0.12) this.pos.addScaledVector(w.n, -(hug.dist - R - 0.08));
     }
-    // feed speed along the wall, up to the cap
+    // feed a little speed along the wall, up to the cap
     let s = this.vel.x * w.t.x + this.vel.z * w.t.z;
-    s = Math.min(CAP, Math.max(s, 10) + 9 * dt);
+    s = Math.min(CAP, Math.max(s, 10) + 4 * dt);
     this.vel.x = w.t.x * s - w.n.x * 1.2; // slight stick into the wall
     this.vel.z = w.t.z * s - w.n.z * 1.2;
     // vertical: a slight rise that relaxes into a shallow glide
@@ -503,23 +525,27 @@ export class Player {
     const side = Math.sign(c.n.x * -_a.z + c.n.z * _a.x) || 1;
     this.wallrun = { n: c.n.clone(), t: _a.clone(), side, timer: 0, contact: 0.15, col: c.col };
     this.canDoubleJump = true;
-    if (this.dashCharges < 3) this.dashCharges++;
-    this.boost(2, null, 12); // touching a wall feeds you speed
+    this.dashCharges = 1;
+    this.boost(0, null, 11); // never start a wall-run slower than a jog
     this.emit('wallrun_start', { side });
   }
 
   // ------------------------------------------------------------------
   updateGrapple(dt, inp, aim) {
-    if (inp.grapple && !this.grapple && this.grappleCooldown <= 0) {
+    // pressing the button queues the attempt for a beat, so a click while
+    // turning toward a surface still latches instead of dying silently
+    if (inp.grapple) this.grappleQueue = 0.3;
+    if (this.grappleQueue > 0 && !this.grapple && this.grappleCooldown <= 0 &&
+        (inp.grapple || inp.grappleHeld)) {
       const hit = this.acquireGrapple(aim);
       if (hit) {
-        const d = this.center().distanceTo(hit);
+        this.grappleQueue = 0;
         this.grapple = {
-          mode: 'held', point: hit, len: Math.max(3.5, d), heldTime: 0,
-          timer: 2.2, pullSpeed: Math.max(30, this.hspeed() + 6),
+          mode: 'held', point: hit, heldTime: 0,
+          timer: 3, pullSpeed: Math.max(20, this.hspeed() + 2),
         };
         this.emit('grapple_fire', { point: hit.clone() });
-      } else {
+      } else if (inp.grapple) {
         this.emit('fizzle', {});
       }
     }
@@ -527,7 +553,7 @@ export class Player {
     const g = this.grapple;
     if (g.mode === 'held') {
       g.heldTime += dt;
-      if (g.heldTime >= 0.22) {
+      if (g.heldTime >= 0.25) {
         g.mode = 'swing';
         this.canDoubleJump = true;
         this.emit('grapple_latch', {});
@@ -542,9 +568,7 @@ export class Player {
         this.pound = false;
         this.emit('grapple_latch', {});
       } else if (g.mode === 'swing') {
-        // release at the top of the arc and sling out faster than you came in
-        this.vel.multiplyScalar(1.07);
-        this.boost(2, null, 0);
+        // let go: keep exactly what the swing gave you
         this.clampH();
         this.canDoubleJump = true;
         this.postJumpGrace = 0.3;
@@ -555,42 +579,61 @@ export class Player {
   }
 
   acquireGrapple(aim) {
-    // generous aim assist: any ring within ~14 degrees wins first
-    let best = null, bestScore = 0.968;
+    // generous aim assist: any ring within ~18 degrees wins first
+    let best = null, bestScore = 0.951;
     for (const a of this.world.anchors) {
       _a.copy(a.pos).sub(aim.origin);
       const d = _a.length();
-      if (d > 80 || d < 2) continue;
+      if (d > 130 || d < 2) continue;
       _a.divideScalar(d);
       const dot = _a.dot(aim.dir);
       if (dot > bestScore) { bestScore = dot; best = a.pos; }
     }
     if (best) return best.clone();
-    // otherwise: latch to whatever surface you're looking at
-    const hit = this.world.raycast(aim.origin, aim.dir, 65);
-    if (hit && hit.dist > 4) return hit.point.clone();
+    // latch to whatever surface you're looking at — everything is grappleable
+    const hit = this.world.raycast(aim.origin, aim.dir, 130);
+    if (hit && hit.dist > 3) return hit.point.clone();
+    // near-miss forgiveness: fan a cone of rays around the crosshair
+    _d.crossVectors(aim.dir, UP);
+    if (_d.lengthSq() < 1e-4) _d.set(1, 0, 0); else _d.normalize();
+    _e.crossVectors(aim.dir, _d).normalize();
+    for (const spread of [0.05, 0.11]) {
+      for (let i = 0; i < 8; i++) {
+        const th = (i / 8) * Math.PI * 2;
+        _a.copy(aim.dir)
+          .addScaledVector(_d, Math.cos(th) * spread)
+          .addScaledVector(_e, Math.sin(th) * spread)
+          .normalize();
+        const h = this.world.raycast(aim.origin, _a, 130);
+        if (h && h.dist > 3) return h.point.clone();
+      }
+    }
     return null;
   }
 
+  // held grapple: a firm pull toward the point that keeps your sideways
+  // motion, so it naturally arcs into a swing (Echo Point Nova style)
   updateSwing(dt) {
     const g = this.grapple;
     const c = this.center();
-    _a.copy(c).sub(g.point);
+    _a.copy(g.point).sub(c);
     const d = _a.length();
-    if (d > g.len) {
-      _a.divideScalar(d);
-      // hard constrain to the rope and keep only tangential velocity
-      const stretch = d - g.len;
-      this.pos.addScaledVector(_a, -stretch);
-      const vr = this.vel.dot(_a);
-      if (vr > 0) this.vel.addScaledVector(_a, -vr);
-      // pump the swing: tangential push, capped
-      if (this.vel.lengthSq() > 1 && this.vel.length() < CAP) {
-        _b.copy(this.vel).normalize();
-        this.vel.addScaledVector(_b, 7 * dt);
-      }
+    _a.divideScalar(Math.max(d, 1e-4));
+    const vr = this.vel.dot(_a); // speed toward the point
+    if (d < 3 || (d < 7 && vr < 0)) {
+      // arrived (or slung past): let go cleanly, keep everything
+      this.vel.y = Math.max(this.vel.y, 3);
+      this.clampH();
+      this.canDoubleJump = true;
+      this.postJumpGrace = 0.3;
+      this.emit('grapple_pull_arrive', {});
+      this.endGrapple();
+      return;
     }
-    g.len = Math.max(4, g.len - 2.4 * dt); // auto-shorten = free energy
+    this.vel.addScaledVector(_a, 36 * dt);            // reel toward the point
+    const vr2 = this.vel.dot(_a);
+    if (vr2 > 24) this.vel.addScaledVector(_a, 24 - vr2); // cap the reel speed
+    this.clampH();
   }
 
   endGrapple() {
@@ -599,65 +642,82 @@ export class Player {
   }
 
   // ------------------------------------------------------------------
-  tryAttachZip() {
-    if (this.zip || this.zipCooldown > 0 || this.grounded) return;
+  // one system rides both overhead ziplines and ground grind-rails
+  tryAttachLines() {
+    if (this.zip || this.zipCooldown > 0) return;
     if (this.grapple && this.grapple.mode !== 'held') return;
-    const chest = this.center();
-    for (const zl of this.world.ziplines) {
-      // coarse reject
+
+    const tryOne = (zl, refPoint, maxD, needAlong) => {
       _a.copy(zl.a).add(zl.b).multiplyScalar(0.5);
       const half = zl.a.distanceTo(zl.b) / 2 + 4;
-      if (chest.distanceToSquared(_a) > half * half) continue;
-      let bestI = -1, bestD = 2.6;
+      if (refPoint.distanceToSquared(_a) > half * half) return false;
+      let bestI = -1, bestD = maxD;
       for (let i = 0; i < zl.points.length; i++) {
-        const d = chest.distanceTo(zl.points[i]);
+        const d = refPoint.distanceTo(zl.points[i]);
         if (d < bestD) { bestD = d; bestI = i; }
       }
-      if (bestI < 0) continue;
+      if (bestI < 0) return false;
       const t = bestI / (zl.points.length - 1);
       const tan = zl.curve.getTangentAt(clamp(t, 0, 1));
       const along = this.vel.x * tan.x + this.vel.z * tan.z;
+      if (Math.abs(along) < needAlong) return false;
       const dir = along >= 0 ? 1 : -1;
-      this.zip = { zl, t, dir, speed: Math.max(24, this.hspeed() + 4) };
+      const floor = zl.type === 'rail' ? 12 : 14;
+      this.zip = { zl, t, dir, type: zl.type || 'zip', speed: Math.max(floor, this.hspeed()) };
       this.canDoubleJump = true;
-      if (this.dashCharges < 3) this.dashCharges++;
+      this.dashCharges = 1;
       this.pound = false;
-      this.emit('zip_attach', {});
-      return;
+      this.emit('zip_attach', { type: zl.type || 'zip' });
+      return true;
+    };
+
+    if (!this.grounded) {
+      const chest = this.center();
+      for (const zl of this.world.ziplines) {
+        if (tryOne(zl, chest, 2.6, 0)) return;
+      }
+    }
+    // rails grab from the feet, on the ground or falling onto them
+    if (this.vel.y < 3) {
+      _b.copy(this.pos);
+      for (const rl of this.world.rails) {
+        if (tryOne(rl, _b, 1.15, 4)) return;
+      }
     }
   }
 
   updateZip(dt, inp) {
     this.glide = false;
     const z = this.zip;
-    z.speed = Math.min(CAP, z.speed + 8 * dt);
+    const rail = z.type === 'rail';
+    z.speed = Math.min(20, z.speed + (rail ? 2 : 3) * dt);
     z.t += (z.dir * z.speed * dt) / z.zl.len;
     const end = z.t <= 0 || z.t >= 1;
     const tt = clamp(z.t, 0, 1);
     const p = z.zl.curve.getPointAt(tt);
     const tan = z.zl.curve.getTangentAt(tt).multiplyScalar(z.dir);
-    this.pos.set(p.x, p.y - 2.0, p.z);
+    // hang from a zipline; stand on a rail
+    this.pos.set(p.x, p.y - (rail ? -0.02 : 2.0), p.z);
     this.vel.set(tan.x, Math.min(tan.y, 0.2), tan.z).normalize().multiplyScalar(z.speed);
     this.grounded = false;
 
     if (this.jumpBuffer > 0) {
-      // launch off the line
+      // launch off the line, speed intact
       this.jumpBuffer = 0;
       this.detachZip(true);
-      this.vel.y = 8.5;
-      this.boost(2, null, 0);
+      this.vel.y = rail ? JUMP_V : 8.5;
       this.sinceJump = 0;
       this.postJumpGrace = POST_JUMP_GRACE;
       this.emit('zip_dismount', {});
     } else if (inp.crouch) {
-      // drop off with a converted burst — exit faster than you got on
+      // drop off cleanly
       this.detachZip(true);
-      this.boost(4, null, 0);
+      this.boost(1, null, 0);
       this.vel.y = 1.5;
       this.emit('zip_dismount', {});
     } else if (end) {
       this.detachZip(true);
-      this.vel.y += 3;
+      this.vel.y += rail ? 2 : 3;
       this.emit('zip_dismount', {});
     }
   }
@@ -689,7 +749,7 @@ export class Player {
     if (this.jumpBuffer > 0 && c.y > water.surfaceY - 1.3) {
       this.jumpBuffer = 0;
       this.vel.y = 13;
-      this.boost(2, wishMag > 0.1 ? wish : null, 10);
+      this.boost(0, wishMag > 0.1 ? wish : null, 10);
       this.sinceJump = 0;
       this.postJumpGrace = POST_JUMP_GRACE;
       this.inWater = false;
@@ -763,6 +823,7 @@ export class Player {
         this.bhopGrace = BHOP_GRACE;
         this.coyote = COYOTE;
         this.canDoubleJump = true;
+        this.dashCharges = 1;
         this.climbTime = 0;
         this.landPulse = clamp(impact / 22, 0, 1);
         if (this.pound) {
@@ -794,8 +855,8 @@ export class Player {
       } else {
         this.tryStartWallrun();
       }
-      this.tryAttachZip();
     }
+    this.tryAttachLines(); // ziplines in the air, grind rails on the ground
   }
 
   finish(dt) {
@@ -817,7 +878,7 @@ export class Player {
         this.grounded = false;
         this.canDoubleJump = true;
         this.pound = false;
-        if (this.dashCharges < 3) this.dashCharges++;
+        this.dashCharges = 1;
         this.emit('pad', { pos: pad.pos.clone() });
       }
     }

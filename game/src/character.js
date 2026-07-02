@@ -146,18 +146,21 @@ export class Character {
     const speed = p.hspeed();
     const frac = p.speedFrac();
 
-    // --- facing ---
+    // --- facing: always where you're going (the gun-arm handles aim) ---
     let wantYaw;
     if (p.wallrun) wantYaw = Math.atan2(p.wallrun.t.x, -p.wallrun.t.z);
-    else if (aiming) wantYaw = camYaw;
     else if (speed > 2) wantYaw = Math.atan2(p.vel.x, -p.vel.z);
     else wantYaw = camYaw;
     let d = wantYaw - this.yaw;
     while (d > Math.PI) d -= Math.PI * 2;
     while (d < -Math.PI) d += Math.PI * 2;
-    this.yaw += d * Math.min(1, 14 * dt);
+    this.yaw += d * Math.min(1, 12 * dt);
     this.root.position.copy(p.pos);
     this.root.rotation.y = this.yaw;
+
+    // lean into turns: bank by how hard the body is still rotating
+    this.lean = damp(this.lean ?? 0, clamp(-d * 1.1, -0.38, 0.38), 9, dt);
+    this.squash.rotation.z = this.lean;
 
     // --- squash & stretch: subtle, snappy, recovers fast ---
     let sy = 1;
@@ -167,17 +170,21 @@ export class Character {
     this.squashY = damp(this.squashY, sy, 18, dt);
     const sxz = 1 + (1 - this.squashY) * 0.7;
     this.squash.scale.set(sxz, this.squashY, sxz);
-    this.squash.position.y = p.sliding ? -0.35 : 0;
 
     // --- run cycle phase ---
-    this.runPhase += dt * (2.2 + speed * 0.85);
+    this.runPhase += dt * (2.2 + speed * 0.95);
     const ph = this.runPhase;
-    const runAmp = clamp(speed / 13, 0, 1) * (p.grounded ? 1 : 0.35);
-    const swing = Math.sin(ph) * 0.9 * runAmp;
+    const runAmp = clamp(speed / 11, 0, 1) * (p.grounded ? 1 : 0.35);
+    const swing = Math.sin(ph) * 1.05 * runAmp;
+
+    // footstep bob keeps the body springy instead of gliding
+    const bob = p.grounded && !p.sliding ? Math.abs(Math.sin(ph)) * 0.055 * runAmp : 0;
+    this.squash.position.y = (p.sliding ? -0.35 : 0) + bob;
 
     // --- default target pose ---
     const lean = clamp(frac * 0.5, 0, 0.5) * (p.grounded && !p.sliding ? 1 : 0.4);
-    this.setT('torso', -lean, 0, 0);       // negative rotX = lean toward -Z (forward)
+    // torso counter-rotates against the stride so the run reads loose
+    this.setT('torso', -lean, Math.sin(ph) * 0.14 * runAmp, 0);
     this.setT('head', lean * 0.7, 0, 0);   // head counter-tilts to keep eyes level
     this.setT('hipL', swing, 0, 0);
     this.setT('hipR', -swing, 0, 0);
@@ -224,6 +231,26 @@ export class Character {
       this.setT('head', 0, -s * 0.4, -s * 0.2);
       this.setT('shL', s > 0 ? -swing * 0.8 : -1.1, 0, 0.15);
       this.setT('shR', s > 0 ? -1.1 : swing * 0.8, 0, -0.15);
+    } else if (p.zip && p.zip.type === 'rail') {
+      // grind stance: side-on surf, arms out
+      this.setT('torso', -0.1, 0.5, 0.12);
+      this.setT('head', 0, -0.45, 0);
+      this.setT('hipL', -0.55, 0, 0.1);
+      this.setT('hipR', 0.3, 0, -0.1);
+      this.setT('kneeL', 0.55, 0, 0);
+      this.setT('kneeR', 0.5, 0, 0);
+      this.setT('shL', 0, 0, 1.0);
+      this.setT('shR', 0, 0, -1.0);
+    } else if (p.zip) {
+      // hanging from the line by the gun hand
+      this.setT('torso', 0.12, 0, 0);
+      this.setT('shR', 0, 0, -2.85);
+      this.setT('elR', 0, 0, 0);
+      this.setT('shL', -0.3, 0, 0.35);
+      this.setT('hipL', -0.25, 0, 0.06);
+      this.setT('hipR', 0.15, 0, -0.06);
+      this.setT('kneeL', 0.5, 0, 0);
+      this.setT('kneeR', 0.35, 0, 0);
     } else if (p.glide) {
       this.setT('torso', 0.15, 0, 0);
       this.setT('shL', 0, 0, 1.25);
@@ -271,9 +298,11 @@ export class Character {
     }
     this.tip.material.color.setHex(aimNow ? PAL.gold : PAL.magenta);
 
-    // --- ease all joints toward targets ---
-    const k = Math.min(1, 16 * dt);
+    // --- ease joints toward targets: quick limbs, settled core, lazy coat ---
     for (const name in this.joints) {
+      const rate = name.startsWith('coat') ? 8
+        : (name === 'torso' || name === 'head') ? 13 : 20;
+      const k = Math.min(1, rate * dt);
       const c = this.cur[name], t = this.tgt[name];
       c.x += (t.x - c.x) * k; c.y += (t.y - c.y) * k; c.z += (t.z - c.z) * k;
       this.joints[name].rotation.set(c.x, c.y, c.z);

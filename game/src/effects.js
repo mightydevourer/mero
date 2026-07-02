@@ -88,32 +88,20 @@ export class Effects {
     this.blob.rotation.x = -Math.PI / 2;
     scene.add(this.blob);
 
-    // ---- screen-edge speed lines (camera child) ----
-    this.speedMat = new THREE.ShaderMaterial({
-      transparent: true, depthTest: false, depthWrite: false,
-      uniforms: { uT: { value: 0 }, uI: { value: 0 } },
-      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
-      fragmentShader: `
-        varying vec2 vUv; uniform float uT; uniform float uI;
-        float hash(float n){ return fract(sin(n) * 43758.5453); }
-        void main(){
-          vec2 c = vUv - 0.5;
-          float r = length(c) * 2.0;
-          float a = atan(c.y, c.x);
-          float seg = floor(a * 14.0);
-          float speed = 6.0 + hash(seg) * 8.0;
-          float streak = step(0.965, fract(a * 14.0 * 0.15915 + hash(seg * 3.7) + uT * speed * 0.2));
-          float wob = hash(seg + floor(uT * 12.0)) ;
-          float mask = smoothstep(0.62, 1.15, r);
-          gl_FragColor = vec4(0.85, 0.98, 1.0, streak * mask * uI * (0.5 + 0.5 * wob));
-        }`,
+    // ---- air streaks: world-fixed wind lines that whoosh past at speed ----
+    this.windN = 42;
+    this.windPts = [];
+    const windGeo = new THREE.BufferGeometry();
+    this.windAttr = new THREE.BufferAttribute(new Float32Array(this.windN * 2 * 3), 3);
+    windGeo.setAttribute('position', this.windAttr);
+    this.windMat = new THREE.LineBasicMaterial({
+      color: 0xeaffff, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false,
     });
-    this.speedQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.speedMat);
-    this.speedQuad.frustumCulled = false;
-    this.speedQuad.renderOrder = 999;
-    scene.add(this.speedQuad);
-
-    this.trailTimer = 0;
+    this.wind = new THREE.LineSegments(windGeo, this.windMat);
+    this.wind.frustumCulled = false;
+    scene.add(this.wind);
+    for (let i = 0; i < this.windN; i++) this.windPts.push(new THREE.Vector3(0, -999, 0));
   }
 
   // ---------- particles ----------
@@ -224,28 +212,48 @@ export class Effects {
       this.blob.visible = false;
     }
 
-    // motion trail sparkles at speed
-    const frac = player.speedFrac();
-    this.trailTimer -= dt;
-    if (frac > 0.42 && this.trailTimer <= 0) {
-      this.trailTimer = 0.035;
-      _v2.set(player.pos.x, player.pos.y + 0.6, player.pos.z);
-      this.burst(_v2, {
-        color: frac > 0.95 ? PAL.gold : PAL.teal, count: 2, speed: 0.5,
-        life: 0.35, size: 5 + frac * 5, up: 0.3, spread: 0.5, gravity: 0,
-      });
-    }
     // wall-run sparks
     if (player.wallrun) {
       _v2.copy(player.pos).addScaledVector(player.wallrun.n, -0.4);
       _v2.y += 0.3;
       this.burst(_v2, { color: PAL.gold, count: 1, speed: 3, life: 0.3, size: 4, up: 1, spread: 0.2, gravity: 20 });
     }
+    // grind sparks on rails
+    if (player.zip && player.zip.type === 'rail') {
+      this.burst(player.pos, { color: PAL.gold, count: 1, speed: 3, life: 0.25, size: 4, up: 1.5, spread: 0.15, gravity: 18 });
+    }
 
-    // speed lines
-    this.speedMat.uniforms.uT.value = t;
-    const target = clamp((frac - 0.35) / 0.65, 0, 1) * 0.85;
-    const u = this.speedMat.uniforms.uI;
-    u.value += (target - u.value) * Math.min(1, 8 * dt);
+    // air streaks: stationary wind lines the runner rushes past
+    const frac = player.speedFrac();
+    const spd = player.vel.length();
+    const target = clamp((frac - 0.45) / 0.55, 0, 1) * 0.55;
+    this.windMat.opacity += (target - this.windMat.opacity) * Math.min(1, 6 * dt);
+    if (this.windMat.opacity > 0.02 && spd > 1) {
+      _v.copy(player.vel).divideScalar(spd); // travel direction
+      const len = 1.6 + spd * 0.14;
+      for (let i = 0; i < this.windN; i++) {
+        const p = this.windPts[i];
+        _v2.copy(p).sub(player.pos);
+        const ahead = _v2.dot(_v);
+        // respawn streaks that fell behind or drifted wide
+        if (ahead < -6 || _v2.lengthSq() > 2100) {
+          const r = 2.5 + Math.random() * 9;
+          const th = Math.random() * Math.PI * 2;
+          p.copy(player.pos)
+            .addScaledVector(_v, 12 + Math.random() * 28)
+            .add(_v2.set(
+              Math.cos(th) * r,
+              (Math.random() - 0.2) * 7,
+              Math.sin(th) * r,
+            ));
+        }
+        this.windAttr.setXYZ(i * 2, p.x - _v.x * len * 0.5, p.y - _v.y * len * 0.5, p.z - _v.z * len * 0.5);
+        this.windAttr.setXYZ(i * 2 + 1, p.x + _v.x * len * 0.5, p.y + _v.y * len * 0.5, p.z + _v.z * len * 0.5);
+      }
+      this.windAttr.needsUpdate = true;
+      this.wind.visible = true;
+    } else {
+      this.wind.visible = false;
+    }
   }
 }

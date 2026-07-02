@@ -6,7 +6,7 @@ import { PAL } from './util.js';
 // rocket-jump.
 
 const BULLET_SPEED = 130;
-const BLAST_SPEED = 52;
+const BLAST_SPEED = 130; // rocket-fast: fire at your feet and you're airborne NOW
 const AIM_CONE = 0.994;   // ~6 degrees
 const _v = new THREE.Vector3();
 const _m = new THREE.Vector3();
@@ -88,8 +88,9 @@ export class Combat {
     this.fx.ring(pos, PAL.gold, 9, 0.5);
     this.fx.burst(pos, { color: PAL.gold, count: 26, speed: 10, life: 0.55, size: 9, up: 5, spread: 0.6, gravity: 14 });
     this.fx.burst(pos, { color: PAL.coral, count: 14, speed: 7, life: 0.4, size: 7, up: 3, spread: 0.4, gravity: 10 });
-    // knockback launches, never hurts (and pops targets caught in it)
-    this.player.applyBlast(pos, 8.5, 21);
+    // knockback launches, never hurts (and pops targets caught in it) —
+    // a blast at your feet is a superjump; at a wall, a super wall-jump
+    this.player.applyBlast(pos, 9, 30);
     for (const t of this.world.targets) {
       if (t.alive && t.mesh && t.mesh.position.distanceTo(pos) < 7) this.popTarget(t);
     }
@@ -114,7 +115,7 @@ export class Combat {
       this.fire(muzzle, aim);
     }
     if (inp.blast && this.blastCooldown <= 0) {
-      this.blastCooldown = 0.85;
+      this.blastCooldown = 0.7;
       this.fireBlast(muzzle, aim);
     }
 

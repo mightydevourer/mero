@@ -181,7 +181,6 @@ function frame(now) {
     player.reset(world.spawn);
     cameraRig.yaw = world.spawnYaw;
     cameraRig.pitch = -0.12;
-    combat.score = combat.score; // score persists
     onEvent('respawn');
   }
   if (snap.help) hud.help.classList.toggle('hidden');
@@ -223,12 +222,17 @@ function frame(now) {
     milestones.max = true;
     toast('★ MAX SPEED — NOW KEEP IT FLYING ★');
   }
-  for (let i = 0; i < 3; i++) {
-    const pip = hud.pips[i];
+  {
+    const pip = hud.pips[0];
     const fill = pip.firstElementChild;
-    if (i < player.dashCharges) { pip.classList.add('full'); fill.style.width = '100%'; }
-    else if (i === player.dashCharges) { pip.classList.remove('full'); fill.style.width = `${(player.dashRecharge / 1.6) * 100}%`; }
-    else { pip.classList.remove('full'); fill.style.width = '0%'; }
+    if (player.dashCharges > 0 && player.dashCooldown <= 0) {
+      pip.classList.add('full'); fill.style.width = '100%';
+    } else {
+      pip.classList.remove('full');
+      // cooldown drains first; then it waits for a landing/wall/rail to refill
+      const cd = 1 - player.dashCooldown / 0.9;
+      fill.style.width = `${Math.round((player.dashCharges > 0 ? cd : Math.min(cd, 0.65)) * 100)}%`;
+    }
   }
   comboTimer -= dt;
   if (comboTimer <= 0 && combo > 0) { combo = 0; hud.flow.classList.remove('on'); }

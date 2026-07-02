@@ -24,10 +24,12 @@ export class CameraRig {
     this.shake = 0;
     this.eyeH = 1.55;
     this.sens = 0.0023;
+    this.idle = 9; // seconds since the mouse last moved
   }
 
   applyMouse(dx, dy) {
-    this.yaw -= dx * this.sens;
+    if (dx || dy) this.idle = 0;
+    this.yaw += dx * this.sens;   // mouse right = look right
     this.pitch -= dy * this.sens;
     this.pitch = clamp(this.pitch, -1.35, 1.25);
   }
@@ -47,6 +49,21 @@ export class CameraRig {
   }
 
   update(dt, player, world, moveX) {
+    // semi-auto follow: ease behind where you're moving once the mouse has
+    // been quiet for a beat — manual input always wins
+    this.idle += dt;
+    if (this.idle > 0.55) {
+      const s = player.hspeed();
+      if (s > 6) {
+        const want = Math.atan2(player.vel.x, -player.vel.z);
+        let d = want - this.yaw;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        // don't fight a deliberate over-the-shoulder look
+        if (Math.abs(d) < 2.5) this.yaw += d * Math.min(1, dt * (1.0 + s * 0.09));
+      }
+    }
+
     // eye height follows crouch
     const targetEye = 0.55 + player.height * 0.62;
     this.eyeH = damp(this.eyeH, targetEye, 12, dt);
@@ -92,7 +109,7 @@ export class CameraRig {
 
     // FOV: wider with speed + kicks on big moves
     this.kick = damp(this.kick, 0, 6, dt);
-    const targetFov = BASE_FOV + 21 * Math.pow(frac, 1.15) + this.kick;
+    const targetFov = BASE_FOV + 24 * Math.pow(frac, 1.15) + this.kick;
     this.camera.fov = damp(this.camera.fov, targetFov, 10, dt);
     this.camera.updateProjectionMatrix();
   }
