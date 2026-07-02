@@ -23,6 +23,14 @@ export class Combat {
     this.fireTimer = 0;
     this.blastCooldown = 0;
     this.score = 0;
+    // multiplayer hooks (set by main when in a room)
+    this.remotes = null;     // () => iterable of RemotePlayers
+    this.onHit = null;       // (targetId, dmg, kind) => void
+    this.onBoom = null;      // (pos) => void — broadcast my explosions
+  }
+
+  _remoteList() {
+    return this.remotes ? [...this.remotes()].filter((r) => r.alive) : [];
   }
 
   _getBullet(big) {
@@ -41,7 +49,7 @@ export class Combat {
     return b;
   }
 
-  // steer the shot toward the nearest target within the assist cone
+  // steer the shot toward the nearest target/player within the assist cone
   assist(origin, dir) {
     let best = null, bestDot = AIM_CONE;
     for (const t of this.world.targets) {
@@ -51,10 +59,18 @@ export class Combat {
       if (d < 2 || d > 130) continue;
       _v.divideScalar(d);
       const dot = _v.dot(dir);
-      if (dot > bestDot) { bestDot = dot; best = t; }
+      if (dot > bestDot) { bestDot = dot; best = t.mesh ? t.mesh.position : t.base; }
+    }
+    for (const r of this._remoteList()) {
+      _v.copy(r.center()).sub(origin);
+      const d = _v.length();
+      if (d < 3 || d > 130) continue;
+      _v.divideScalar(d);
+      const dot = _v.dot(dir);
+      if (dot > bestDot) { bestDot = dot; best = r.center().clone(); }
     }
     if (best) {
-      _v.copy(best.mesh ? best.mesh.position : best.base).sub(origin).normalize();
+      _v.copy(best).sub(origin).normalize();
       return _v.clone();
     }
     return dir.clone();
@@ -67,10 +83,14 @@ export class Combat {
     b.vel.copy(dir).multiplyScalar(BULLET_SPEED);
     b.life = 1.2;
     b.blast = false;
+    b.visualOnly = false;
     b.mesh.position.copy(b.pos);
     this.bullets.push(b);
     this.fx.burst(muzzle, { color: PAL.magenta, count: 3, speed: 2, life: 0.15, size: 6, up: 0, spread: 0.1, gravity: 0 });
-    this.emit('shoot', {});
+    this.emit('shoot', {
+      o: [+muzzle.x.toFixed(2), +muzzle.y.toFixed(2), +muzzle.z.toFixed(2)],
+      d: [+dir.x.toFixed(3), +dir.y.toFixed(3), +dir.z.toFixed(3)],
+    });
   }
 
   fireBlast(muzzle, aim) {
@@ -79,22 +99,55 @@ export class Combat {
     b.vel.copy(aim.dir).multiplyScalar(BLAST_SPEED);
     b.life = 1.4;
     b.blast = true;
+    b.visualOnly = false;
     b.mesh.position.copy(b.pos);
     this.bullets.push(b);
     this.emit('blast_fire', {});
   }
 
-  explode(pos) {
+  boomVisual(pos) {
     this.fx.ring(pos, PAL.gold, 9, 0.5);
     this.fx.burst(pos, { color: PAL.gold, count: 26, speed: 10, life: 0.55, size: 9, up: 5, spread: 0.6, gravity: 14 });
     this.fx.burst(pos, { color: PAL.coral, count: 14, speed: 7, life: 0.4, size: 7, up: 3, spread: 0.4, gravity: 10 });
-    // knockback launches, never hurts (and pops targets caught in it) —
+    this.emit('blast_hit', { pos: pos.clone() });
+  }
+
+  explode(pos) {
+    this.boomVisual(pos);
+    if (this.onBoom) this.onBoom(pos);
+    // knockback launches, never hurts you (and pops targets caught in it) —
     // a blast at your feet is a superjump; at a wall, a super wall-jump
     this.player.applyBlast(pos, 9, 30);
     for (const t of this.world.targets) {
       if (t.alive && t.mesh && t.mesh.position.distanceTo(pos) < 7) this.popTarget(t);
     }
-    this.emit('blast_hit', { pos: pos.clone() });
+    // friends caught in the blast take falloff damage (knockback arrives
+    // via the boom broadcast so bystanders get flung too)
+    if (this.onHit) {
+      for (const r of this._remoteList()) {
+        const d = r.center().distanceTo(pos);
+        if (d < 9) this.onHit(r.id, Math.round(40 - (d / 9) * 28), 'blast');
+      }
+    }
+  }
+
+  // a friend's explosion: visuals + knockback for us if we're close
+  remoteBoom(pos) {
+    this.boomVisual(pos);
+    this.player.applyBlast(pos, 9, 24);
+  }
+
+  // a friend's bullet: visual-only tracer (their client scores the hit)
+  spawnTracer(from, dir) {
+    const b = this._getBullet(false);
+    b.pos.copy(from);
+    b.vel.copy(dir).multiplyScalar(BULLET_SPEED);
+    b.life = 1.2;
+    b.blast = false;
+    b.visualOnly = true;
+    b.mesh.position.copy(b.pos);
+    this.bullets.push(b);
+    this.emit('shoot', {});
   }
 
   popTarget(t) {
@@ -133,20 +186,40 @@ export class Combat {
       if (wHit) hitAt = wHit.point;
       // target hit (segment vs sphere, generous radius)
       let hitTarget = null;
-      for (const t of this.world.targets) {
-        if (!t.alive || !t.mesh) continue;
-        const tp = t.mesh.position;
-        const toT = _v.set(tp.x - b.pos.x, tp.y - b.pos.y, tp.z - b.pos.z);
-        const along = toT.dot(_m);
-        if (along < -t.r || along > stepLen + t.r) continue;
-        const closest2 = toT.lengthSq() - along * along;
-        if (closest2 < t.r * t.r) { hitTarget = t; hitAt = tp.clone(); break; }
+      let hitRemote = null;
+      if (!b.visualOnly) {
+        for (const t of this.world.targets) {
+          if (!t.alive || !t.mesh) continue;
+          const tp = t.mesh.position;
+          const toT = _v.set(tp.x - b.pos.x, tp.y - b.pos.y, tp.z - b.pos.z);
+          const along = toT.dot(_m);
+          if (along < -t.r || along > stepLen + t.r) continue;
+          const closest2 = toT.lengthSq() - along * along;
+          if (closest2 < t.r * t.r) { hitTarget = t; hitAt = tp.clone(); break; }
+        }
+        // friends: generous capsule-ish sphere at their center
+        if (!hitTarget && !b.blast && this.onHit) {
+          for (const r of this._remoteList()) {
+            const rc = r.center();
+            const toR = _v.set(rc.x - b.pos.x, rc.y - b.pos.y, rc.z - b.pos.z);
+            const along = toR.dot(_m);
+            const rr = 1.05;
+            if (along < -rr || along > stepLen + rr) continue;
+            const closest2 = toR.lengthSq() - along * along;
+            if (closest2 < rr * rr) { hitRemote = r; hitAt = rc.clone(); break; }
+          }
+        }
       }
 
+      if (hitRemote) {
+        this.onHit(hitRemote.id, 10, 'bullet');
+        this.fx.burst(hitAt, { color: PAL.coral, count: 8, speed: 5, life: 0.3, size: 6, up: 2, spread: 0.3, gravity: 8 });
+        this.emit('hitmark', {});
+      }
       if (hitTarget && !b.blast) this.popTarget(hitTarget);
       if (hitAt || b.life <= 0) {
         if (b.blast) this.explode(hitAt || b.pos);
-        else if (hitAt && !hitTarget) {
+        else if (hitAt && !hitTarget && !hitRemote) {
           this.fx.burst(hitAt, { color: PAL.magenta, count: 5, speed: 3, life: 0.25, size: 5, up: 1, spread: 0.1, gravity: 6 });
         }
         b.mesh.visible = false;

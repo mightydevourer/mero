@@ -118,6 +118,21 @@ export class GameAudio {
         this.tone({ type: 'sine', from: 700, to: 1400, dur: 0.16, vol: 0.3 });
         this.tone({ type: 'sine', from: 1050, to: 2100, dur: 0.2, vol: 0.18 });
         break;
+      case 'hitmark':
+        this.tone({ type: 'square', from: 1800, to: 1400, dur: 0.05, vol: 0.16, attack: 0.001 });
+        break;
+      case 'hurt':
+        this.noise({ dur: 0.12, vol: 0.3, from: 700, to: 200 });
+        this.tone({ type: 'sawtooth', from: 220, to: 130, dur: 0.12, vol: 0.14 });
+        break;
+      case 'death':
+        this.tone({ type: 'sawtooth', from: 400, to: 60, dur: 0.6, vol: 0.3 });
+        this.noise({ dur: 0.5, vol: 0.3, from: 1200, to: 100 });
+        break;
+      case 'kill':
+        this.tone({ type: 'sine', from: 620, to: 940, dur: 0.12, vol: 0.26 });
+        this.tone({ type: 'sine', from: 930, to: 1400, dur: 0.16, vol: 0.2 });
+        break;
       case 'blast_fire': this.noise({ dur: 0.15, vol: 0.3, from: 2000, to: 500, type: 'bandpass', q: 1 }); break;
       case 'blast_hit':
         this.noise({ dur: 0.5, vol: 0.55, from: 900, to: 70 });

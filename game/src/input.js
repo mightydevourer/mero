@@ -55,7 +55,10 @@ export class Input {
   }
 
   requestLock() {
-    try { this.dom.requestPointerLock(); } catch (_) { /* headless / denied */ }
+    try {
+      const p = this.dom.requestPointerLock();
+      if (p && p.catch) p.catch(() => { /* headless / denied */ });
+    } catch (_) { /* headless / denied */ }
   }
 
   key(c) { return this.keys.has(c); }

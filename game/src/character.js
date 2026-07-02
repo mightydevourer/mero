@@ -5,7 +5,7 @@ import { PAL, toon, glow, clamp, damp } from './util.js';
 // candy brights (Gigantic). Fully procedural animation — poses are joint
 // targets blended per-state, with squash & stretch layered on top.
 
-const COL = {
+const BASE_COL = {
   coat: PAL.plum,
   coatTrim: PAL.gold,
   vest: 0x35205e,
@@ -18,6 +18,18 @@ const COL = {
   hat: 0x4a2478,
 };
 
+// coat/hat/vest combos so every player in a room reads instantly
+export const ACCENTS = [
+  { coat: PAL.plum, hat: 0x4a2478, vest: 0x35205e },
+  { coat: 0x1a8f7c, hat: 0x0f6b5c, vest: 0x0d4f44, tie: PAL.gold },
+  { coat: 0xc0392b, hat: 0x8f2418, vest: 0x6e1a10, tie: PAL.teal },
+  { coat: 0x2e5fb7, hat: 0x1f4287, vest: 0x173263, tie: PAL.gold },
+  { coat: 0xd97a1a, hat: 0xa85c0f, vest: 0x7d440b, tie: PAL.teal },
+  { coat: 0x2f7d32, hat: 0x1f5c22, vest: 0x164418, tie: PAL.coral },
+  { coat: 0xa53fa5, hat: 0x7c2d7c, vest: 0x5c215c, tie: PAL.gold },
+  { coat: 0x36454f, hat: 0x24303a, vest: 0x1a242c, tie: PAL.magenta },
+];
+
 function box(w, h, d, color, x = 0, y = 0, z = 0) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), toon(color));
   m.position.set(x, y, z);
@@ -25,7 +37,8 @@ function box(w, h, d, color, x = 0, y = 0, z = 0) {
 }
 
 export class Character {
-  constructor(scene) {
+  constructor(scene, accent = {}) {
+    this.col = { ...BASE_COL, ...accent };
     this.root = new THREE.Group();          // at player feet, yawed
     this.squash = new THREE.Group();        // squash & stretch layer
     this.root.add(this.squash);
@@ -44,6 +57,7 @@ export class Character {
   }
 
   build() {
+    const COL = this.col;
     const S = this.squash;
 
     // --- legs ---
@@ -135,6 +149,14 @@ export class Character {
   }
 
   setT(name, x, y, z) { this.tgt[name].set(x, y, z); }
+
+  dispose() {
+    if (this.root.parent) this.root.parent.remove(this.root);
+    this.root.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material && o.material.dispose) o.material.dispose();
+    });
+  }
 
   // world position of the finger tip (bullet muzzle)
   muzzle(out) {

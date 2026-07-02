@@ -21,6 +21,21 @@ cd game && python3 -m http.server 8080
 # then open http://localhost:8080
 ```
 
+## Multiplayer — Arena with friends
+
+From the title screen: enter a name, click **HOST A ROOM**, and share the
+5-letter room code (or the join link it shows). Friends enter the code and
+click **JOIN** — that's it. Free-for-all in the **Prisma Ring** arena:
+100 HP, finger-gun bullets (10 dmg), blasts (up to 40 dmg + knockback),
+kill feed, frags, 3-second respawns with brief spawn protection, and
+health regen after 6 seconds out of combat. Health bars float over
+everyone's heads, and each runner gets their own coat color.
+
+It's peer-to-peer WebRTC (PeerJS): the host's browser is the server, and
+signaling uses the free public PeerJS broker — nothing to deploy. To use
+your own PeerJS server instead, append `?ps=host:port` to the URL
+(`npx peerjs --port 9000` runs one).
+
 ## Controls
 
 | Input | Action |
@@ -53,16 +68,20 @@ everything into one continuous motion is where the ceiling lives.
 ## Structure
 
 ```
-index.html          HUD + start overlay
+index.html          HUD + menu overlay
 vendor/three.module.js   three.js r160, vendored (works offline)
+vendor/peerjs.min.js     PeerJS 1.5, vendored (multiplayer transport)
 src/
-  main.js           bootstrap, loop (120 Hz fixed-step physics), event fan-out
+  main.js           bootstrap, loop (120 Hz fixed-step physics), net protocol
   player.js         the movement controller — every mechanic + forgiveness layer
-  world.js          "Prisma Cove": colliders, pads, ziplines, rails, rings, targets, zones
-  character.js      procedural runner (suit + long coat) with procedural animation
-  cameraRig.js      third-person camera: speed FOV, tilt, kicks, collision
-  effects.js        particles, speed lines, grapple line, blob shadow
-  combat.js         bullets, aim assist, the blast, target popping
+  world.js          "Prisma Cove" (solo) + "Prisma Ring" (arena): colliders,
+                    pads, ziplines, rails, rings, targets, zones, spawns
+  net.js            P2P rooms over WebRTC: host = hub, room code = peer id
+  remote.js         friends: snapshot interpolation, nameplates, health bars
+  character.js      procedural runner (suit + long coat), per-player accents
+  cameraRig.js      third-person camera: speed FOV, tilt, kicks, auto-follow
+  effects.js        particles, air streaks, grapple line, blob shadow
+  combat.js         bullets, aim assist, the blast, hits on targets & friends
   audio.js          all-synthesized WebAudio (no assets)
   input.js, util.js
 test/

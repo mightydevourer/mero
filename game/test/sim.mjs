@@ -250,5 +250,20 @@ console.log('13. fuzz: 30s of chaotic input never NaNs or breaks the cap');
   check('horizontal speed never broke the cap', capOk, `got ${player.hspeed().toFixed(1)}`);
 }
 
+console.log('14. the arena builds with spawns, rails, pads, and rings');
+{
+  const arena = new World(stubScene, 'arena');
+  check('has solid geometry', arena.colliders.length >= 18, `${arena.colliders.length} colliders`);
+  check('has 8 spawn points', arena.spawnPoints.length === 8, `${arena.spawnPoints.length}`);
+  check('has grind rails', arena.rails.length >= 2);
+  check('has pads and grapple rings', arena.pads.length >= 6 && arena.anchors.length >= 5);
+  // a player can stand on the main floor
+  const p = new Player(arena, () => {});
+  const sp = arena.randomSpawn();
+  p.reset(sp.pos.clone());
+  run(p, arena, 1.0, () => makeInput());
+  check('spawn points rest on solid ground', p.grounded && p.pos.y > -5, `y=${p.pos.y.toFixed(1)} grounded=${p.grounded}`);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -13,8 +13,9 @@ const _v2 = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
 
 export class World {
-  constructor(scene) {
+  constructor(scene, mode = 'cove') {
     this.scene = scene;
+    this.mode = mode;
     this.colliders = [];   // {c, h, q, qi, br, mesh, vel, platform, name}
     this.pads = [];        // {pos, dir, power, mesh, lastFire}
     this.ziplines = [];    // {curve, len, points, type:'zip'}
@@ -27,7 +28,12 @@ export class World {
     this.clouds = [];
     this.spawn = new THREE.Vector3(0, 1.5, 14);
     this.spawnYaw = 0; // camera forward is (sin yaw, 0, -cos yaw): yaw 0 faces -Z
+    this.spawnPoints = [{ pos: this.spawn.clone(), yaw: this.spawnYaw }];
     if (scene) this.build();
+  }
+
+  randomSpawn() {
+    return this.spawnPoints[Math.floor(Math.random() * this.spawnPoints.length)];
   }
 
   // ---------- construction helpers ----------
@@ -262,9 +268,15 @@ export class World {
     this.scene.add(arch);
   }
 
-  // ---------- the level: "Prisma Cove" sky park ----------
+  // ---------- levels ----------
 
   build() {
+    this.buildSky();
+    if (this.mode === 'arena') this.buildArena();
+    else this.buildCove();
+  }
+
+  buildSky() {
     const S = this.scene;
 
     // Sky dome + sun
@@ -303,7 +315,10 @@ export class World {
       S.add(g);
       this.clouds.push({ g, speed: 0.4 + Math.random() * 0.8 });
     }
+  }
 
+  // "Prisma Cove": the solo free-roam sky park
+  buildCove() {
     // === ISLAND A: spawn plaza + bhop runway (0,0,0), 74 x 84 ===
     this.island(0, 0, -5, 74, 84);
     // plaza disc
@@ -415,6 +430,67 @@ export class World {
     this.addRail([
       [110, -11.45, 26], [114, -11.45, 6], [106, -11.45, -12], [92, -11.45, -20],
     ]);
+  }
+
+  // "Prisma Ring": the multiplayer arena — symmetric, fast, vertical
+  buildArena() {
+    // main floor
+    this.island(0, 0, 0, 64, 64, { depth: 9 });
+    // center pillar with a ring on top and a launch pad at its base
+    this.addBox(0, 4.5, 0, 9, 9, 9, { mat: toon(PAL.cliff), name: 'pillar' });
+    this.addBox(0, 9.4, 0, 12, 1, 12, { mat: toon(PAL.grass), name: 'pillartop' });
+    this.addAnchor(0, 22, 0);
+    this.addPad(7.5, 0.3, 0, [0.35, 1, 0], 22);
+    this.addPad(-7.5, 0.3, 0, [-0.35, 1, 0], 22);
+    this.addLowGrav(0, 16, 0, 13); // aerial-duel bubble over the pillar
+
+    // four corner plates at height, reached by ramps
+    for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) {
+      this.addBox(sx * 26, 5.5, sz * 26, 16, 1.4, 16, { mat: toon(PAL.grassDark), name: 'plate' });
+      this.addBox(sx * 17, 2.6, sz * 17, 14, 1.2, 6, {
+        mat: toon(PAL.cliffShade), rotZ: sx * -0.42, rotY: sz * sx * Math.PI / 4, name: 'ramp',
+      });
+      this.addPad(sx * 30, 6.4, sz * 30, [-sx * 0.3, 1, -sz * 0.3], 20);
+      this.addAnchor(sx * 18, 14, sz * 18);
+      this.crystal(sx * 30, 6.2, sz * 21, 1.1, sx * sz > 0 ? PAL.magenta : PAL.teal);
+    }
+
+    // wall-run walls on the mid-edges (fight around them, run along them)
+    this.addBox(0, 5, 30, 26, 11, 2, { mat: toon(PAL.coral), name: 'wall' });
+    this.addBox(0, 5, -30, 26, 11, 2, { mat: toon(PAL.coral), name: 'wall' });
+    this.addBox(30, 5, 0, 2, 11, 26, { mat: toon(PAL.cliffShade), name: 'wall' });
+    this.addBox(-30, 5, 0, 2, 11, 26, { mat: toon(PAL.cliffShade), name: 'wall' });
+
+    // grind rails arcing around the outside of the walls
+    this.addRail([
+      [24, 6.2, 26], [34, 6.2, 12], [37, 6.2, 0], [34, 6.2, -12], [24, 6.2, -26],
+    ]);
+    this.addRail([
+      [-24, 6.2, -26], [-34, 6.2, -12], [-37, 6.2, 0], [-34, 6.2, 12], [-24, 6.2, 26],
+    ]);
+
+    // satellite islands with pads back into the fray
+    for (const [x, z] of [[0, 48], [0, -48], [48, 0], [-48, 0]]) {
+      this.island(x, 8, z, 12, 12, { depth: 4 });
+      this.addPad(x, 8.4, z, [-Math.sign(x) * 0.45, 1, -Math.sign(z) * 0.45], 21);
+      this.addAnchor(x * 0.6, 18, z * 0.6);
+    }
+
+    this.tree(12, 0, 12, 1.0); this.tree(-12, 0, -12, 1.1);
+    this.archGate(0, 0.4, 18, 4.2);
+
+    // spawn points around the ring, facing the center
+    this.spawnPoints = [];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+      const r = i % 2 === 0 ? 24 : 27;
+      const x = Math.sin(a) * r, z = Math.cos(a) * r;
+      // face the center: forward is (sin yaw, -cos yaw)
+      const yaw = Math.atan2(-x, z);
+      this.spawnPoints.push({ pos: new THREE.Vector3(x, i % 2 === 0 ? 7.5 : 1.5, z), yaw });
+    }
+    this.spawn = this.spawnPoints[0].pos.clone();
+    this.spawnYaw = this.spawnPoints[0].yaw;
   }
 
   // ---------- queries ----------
