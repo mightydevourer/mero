@@ -1,19 +1,30 @@
 import React from "react";
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { GradientBackground } from "./GradientBackground";
 import { Bubbles } from "./Bubbles";
 import { discountBumper, theme } from "./content";
+
+const EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
+
+const fadeUp = (frame: number, start: number, dur = 20) => ({
+  opacity: interpolate(frame, [start, start + dur], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  }),
+  translate: `0px ${interpolate(frame, [start, start + dur], [16, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  })}px`,
+});
 
 export const SceneDiscount: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const eyebrowIn = spring({ frame: frame - 6, fps, config: { damping: 18 } });
   const badgeIn = spring({ frame: frame - 18, fps, config: { damping: 12, mass: 0.7 } });
-  const subtextIn = spring({ frame: frame - 60, fps, config: { damping: 18 } });
-  const chipsIn = spring({ frame: frame - 78, fps, config: { damping: 18 } });
-
-  const badgeScale = interpolate(badgeIn, [0, 1], [0.4, 1]);
+  const badgeScale = interpolate(badgeIn, [0, 1], [0.4, 1], { output: "perceptual-scale" });
 
   return (
     <AbsoluteFill>
@@ -27,8 +38,7 @@ export const SceneDiscount: React.FC = () => {
             fontWeight: 700,
             fontSize: 34,
             color: theme.goldSoft,
-            opacity: interpolate(eyebrowIn, [0, 1], [0, 1]),
-            transform: `translateY(${interpolate(eyebrowIn, [0, 1], [16, 0])}px)`,
+            ...fadeUp(frame, 6),
           }}
         >
           {discountBumper.eyebrow}
@@ -46,7 +56,7 @@ export const SceneDiscount: React.FC = () => {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            transform: `scale(${badgeScale})`,
+            scale: badgeScale,
             boxShadow: "0 30px 60px rgba(0,0,0,0.35)",
           }}
         >
@@ -65,8 +75,7 @@ export const SceneDiscount: React.FC = () => {
             fontWeight: 700,
             fontSize: 34,
             color: theme.white,
-            opacity: interpolate(subtextIn, [0, 1], [0, 1]),
-            transform: `translateY(${interpolate(subtextIn, [0, 1], [16, 0])}px)`,
+            ...fadeUp(frame, 60),
           }}
         >
           {discountBumper.subtext}
@@ -77,8 +86,7 @@ export const SceneDiscount: React.FC = () => {
             marginTop: 50,
             display: "flex",
             gap: 24,
-            opacity: interpolate(chipsIn, [0, 1], [0, 1]),
-            transform: `translateY(${interpolate(chipsIn, [0, 1], [16, 0])}px)`,
+            ...fadeUp(frame, 78),
           }}
         >
           {discountBumper.chips.map((chip) => (

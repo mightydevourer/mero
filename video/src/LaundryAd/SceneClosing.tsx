@@ -1,17 +1,34 @@
 import React from "react";
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { ShopBackground } from "./ShopBackground";
 import { Bubbles } from "./Bubbles";
 import { closing, theme } from "./content";
+
+const EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
+
+const fadeUp = (frame: number, start: number, dur = 20) => ({
+  opacity: interpolate(frame, [start, start + dur], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  }),
+  translate: `0px ${interpolate(frame, [start, start + dur], [16, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  })}px`,
+});
 
 export const SceneClosing: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const nameIn = spring({ frame: frame - 8, fps, config: { damping: 18 } });
   const pillIn = spring({ frame: frame - 28, fps, config: { damping: 14, mass: 0.7 } });
-  const addressIn = spring({ frame: frame - 48, fps, config: { damping: 18 } });
+  const pillScale = interpolate(pillIn, [0, 1], [0.6, 1], { output: "perceptual-scale" });
+
   const ctaIn = spring({ frame: frame - 90, fps, config: { damping: 12, mass: 0.7 } });
+  const ctaOpacity = interpolate(ctaIn, [0, 1], [0, 1]);
+  const ctaScale = interpolate(ctaIn, [0, 1], [0.85, 1], { output: "perceptual-scale" });
 
   return (
     <AbsoluteFill>
@@ -31,8 +48,7 @@ export const SceneClosing: React.FC = () => {
             fontWeight: 900,
             fontSize: 74,
             color: theme.white,
-            opacity: interpolate(nameIn, [0, 1], [0, 1]),
-            transform: `translateY(${interpolate(nameIn, [0, 1], [20, 0])}px)`,
+            ...fadeUp(frame, 8),
           }}
         >
           {closing.name}
@@ -44,7 +60,7 @@ export const SceneClosing: React.FC = () => {
             backgroundColor: theme.gold,
             borderRadius: 999,
             padding: "12px 44px",
-            transform: `scale(${interpolate(pillIn, [0, 1], [0.6, 1])})`,
+            scale: pillScale,
             opacity: interpolate(pillIn, [0, 1], [0, 1]),
           }}
         >
@@ -57,8 +73,7 @@ export const SceneClosing: React.FC = () => {
           style={{
             marginTop: 34,
             textAlign: "center",
-            opacity: interpolate(addressIn, [0, 1], [0, 1]),
-            transform: `translateY(${interpolate(addressIn, [0, 1], [16, 0])}px)`,
+            ...fadeUp(frame, 48),
           }}
         >
           <div style={{ fontFamily: "Cairo", fontWeight: 800, fontSize: 34, color: theme.white }}>
@@ -76,8 +91,8 @@ export const SceneClosing: React.FC = () => {
             fontWeight: 800,
             fontSize: 44,
             color: theme.green,
-            opacity: interpolate(ctaIn, [0, 1], [0, 1]),
-            transform: `scale(${interpolate(ctaIn, [0, 1], [0.85, 1])})`,
+            opacity: ctaOpacity,
+            scale: ctaScale,
           }}
         >
           {closing.cta}

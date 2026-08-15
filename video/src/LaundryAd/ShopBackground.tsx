@@ -1,10 +1,12 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Easing,
   interpolate,
   OffthreadVideo,
   staticFile,
   useCurrentFrame,
+  useVideoConfig,
 } from "remotion";
 
 /**
@@ -28,14 +30,18 @@ export const ShopBackground: React.FC<{
   panelFromPercent = 50,
 }) => {
   const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
 
   return (
     <AbsoluteFill style={{ backgroundColor: "#05070c", overflow: "hidden" }}>
       <AbsoluteFill
         style={{
-          transform: `scale(${interpolate(frame, [0, 600], [zoomFrom, zoomTo], {
+          scale: interpolate(frame, [0, durationInFrames], [zoomFrom, zoomTo], {
+            extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
-          })})`,
+            easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+            output: "perceptual-scale",
+          }),
         }}
       >
         <OffthreadVideo

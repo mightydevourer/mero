@@ -1,22 +1,45 @@
 import React from "react";
-import { AbsoluteFill, interpolate, Series, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Easing, interpolate, Series, useCurrentFrame } from "remotion";
 import { ShopBackground } from "./ShopBackground";
 import { Bubbles } from "./Bubbles";
 import { DotProgress } from "./DotProgress";
 import { services, theme } from "./content";
 
 const ITEM_DURATION = 60;
+const EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
 
 const tints = [undefined, "#2b3f66", "#2b3f66", undefined];
 const startOffsets = [0, 0.6, 1.4, 0.3];
 
 const ServiceItem: React.FC<{ index: number }> = ({ index }) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
   const service = services[index];
 
-  const titleIn = spring({ frame: frame - 6, fps, config: { damping: 18 } });
-  const subIn = spring({ frame: frame - 22, fps, config: { damping: 18 } });
+  const titleOpacity = interpolate(frame, [6, 22], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  });
+  const titleY = interpolate(frame, [6, 22], [22, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  });
+  const underlineScale = interpolate(frame, [6, 22], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  });
+  const subOpacity = interpolate(frame, [22, 38], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  });
+  const subY = interpolate(frame, [22, 38], [16, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  });
 
   return (
     <AbsoluteFill>
@@ -43,8 +66,8 @@ const ServiceItem: React.FC<{ index: number }> = ({ index }) => {
             fontWeight: 900,
             fontSize: 78,
             color: theme.white,
-            opacity: interpolate(titleIn, [0, 1], [0, 1]),
-            transform: `translateY(${interpolate(titleIn, [0, 1], [22, 0])}px)`,
+            opacity: titleOpacity,
+            translate: `0px ${titleY}px`,
           }}
         >
           {service.title}
@@ -56,7 +79,7 @@ const ServiceItem: React.FC<{ index: number }> = ({ index }) => {
             backgroundColor: theme.gold,
             marginTop: 16,
             marginBottom: 18,
-            transform: `scaleX(${interpolate(titleIn, [0, 1], [0, 1])})`,
+            scale: underlineScale,
           }}
         />
         <div
@@ -65,8 +88,8 @@ const ServiceItem: React.FC<{ index: number }> = ({ index }) => {
             fontWeight: 600,
             fontSize: 36,
             color: "rgba(255,255,255,0.9)",
-            opacity: interpolate(subIn, [0, 1], [0, 1]),
-            transform: `translateY(${interpolate(subIn, [0, 1], [16, 0])}px)`,
+            opacity: subOpacity,
+            translate: `0px ${subY}px`,
           }}
         >
           {service.subtitle}

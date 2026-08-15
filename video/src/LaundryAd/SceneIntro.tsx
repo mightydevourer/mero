@@ -1,22 +1,40 @@
 import React from "react";
-import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 import { ShopBackground } from "./ShopBackground";
 import { Bubbles } from "./Bubbles";
 import { brand, theme } from "./content";
 
+const EASE_OUT = Easing.bezier(0.16, 1, 0.3, 1);
+
 export const SceneIntro: React.FC = () => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
 
-  const titleIn = spring({ frame: frame - 12, fps, config: { damping: 18 } });
-  const titleY = interpolate(titleIn, [0, 1], [24, 0]);
-  const titleOpacity = interpolate(titleIn, [0, 1], [0, 1]);
+  const titleOpacity = interpolate(frame, [12, 30], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  });
+  const titleY = interpolate(frame, [12, 30], [24, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  });
 
-  const subIn = spring({ frame: frame - 48, fps, config: { damping: 18 } });
-  const subOpacity = interpolate(subIn, [0, 1], [0, 1]);
-  const subY = interpolate(subIn, [0, 1], [16, 0]);
-
-  const underlineScale = interpolate(subIn, [0, 1], [0, 1]);
+  const subOpacity = interpolate(frame, [48, 68], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  });
+  const subY = interpolate(frame, [48, 68], [16, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  });
+  const underlineScale = interpolate(frame, [48, 68], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: EASE_OUT,
+  });
 
   return (
     <AbsoluteFill>
@@ -37,7 +55,7 @@ export const SceneIntro: React.FC = () => {
             fontSize: 92,
             color: theme.white,
             opacity: titleOpacity,
-            transform: `translateY(${titleY}px)`,
+            translate: `0px ${titleY}px`,
             textAlign: "center",
           }}
         >
@@ -50,7 +68,7 @@ export const SceneIntro: React.FC = () => {
             backgroundColor: theme.gold,
             marginTop: 18,
             marginBottom: 22,
-            transform: `scaleX(${underlineScale})`,
+            scale: underlineScale,
           }}
         />
         <div
@@ -60,7 +78,7 @@ export const SceneIntro: React.FC = () => {
             fontSize: 42,
             color: "rgba(255,255,255,0.92)",
             opacity: subOpacity,
-            transform: `translateY(${subY}px)`,
+            translate: `0px ${subY}px`,
           }}
         >
           {brand.tagline}
