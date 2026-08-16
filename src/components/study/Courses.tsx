@@ -14,8 +14,8 @@ import { useToast } from '../../lib/toast'
 import { PlusIcon, TrashIcon } from '../Icons'
 import { Field, Modal, SectionEmpty } from './ui'
 
-/** Monday-first ordering over `Date.prototype.getDay()` values. */
-const WEEK_ORDER: Weekday[] = [1, 2, 3, 4, 5, 6, 0]
+/** Sunday-first ordering over `Date.prototype.getDay()` values. */
+const WEEK_ORDER: Weekday[] = [0, 1, 2, 3, 4, 5, 6]
 
 function CourseForm({ course, onClose }: { course?: Course; onClose: () => void }) {
   const courses = useCourses()

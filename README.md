@@ -57,7 +57,7 @@ The academic half of Mero: what you have to read *by when*, next to the reading 
   overdue / exams ahead, then today's tasks, today's lectures, and countdowns to upcoming
   assignments and exams. Overdue work gets its own band at the top.
 - **Courses** (`/study/courses`) — courses with instructor, code and colour, plus a
-  Monday-first **weekly schedule** of recurring lecture slots (day, time, room).
+  Sunday-first **weekly schedule** of recurring lecture slots (day, time, room).
 - **Tasks** (`/study/tasks`) — assignments (deadline-bearing coursework) and day-to-day study
   tasks in one list, each with **High / Medium / Low** priority and an optional course and
   deadline. Filter by type, status or course, search by text, and tick items off inline.
