@@ -1,0 +1,15 @@
+# Netlify redirect rules. Vite copies everything in public/ into dist/, so this
+# file ships inside the published folder and therefore works for BOTH a
+# Git-connected build and a drag-and-drop deploy of dist/ (which never sees the
+# netlify.toml at the repo root).
+#
+# First matching rule wins, so the specific rule comes before the catch-all.
+
+# The .htaccess beside it is Apache configuration for InfinityFree. Netlify
+# does not interpret it and would otherwise serve it as a plain text file.
+/.htaccess      /index.html   404
+
+# SPA routing: any path that is not a real file is handed to the app.
+# Status 200 rewrites instead of redirecting, so the router still sees the
+# original URL — /study/courses stays /study/courses in the address bar.
+/*              /index.html   200

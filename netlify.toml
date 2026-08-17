@@ -1,0 +1,51 @@
+# ===========================================================================
+# Netlify configuration for Mero.
+#
+# Read when the site is built from the connected Git repository. A
+# drag-and-drop deploy of dist/ does NOT see this file — it lives at the repo
+# root, outside the published folder — so the SPA rule is duplicated in
+# public/_redirects, which Vite copies into dist/.
+#
+# Netlify ignores the .htaccess in this project entirely; that file is for
+# Apache hosts such as InfinityFree.
+# ===========================================================================
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Pinned so a Netlify default bump cannot change the build under us.
+  NODE_VERSION = "20"
+
+# --- SPA routing -----------------------------------------------------------
+# /study, /study/courses and /read/<id> exist only in the browser's router.
+# Without this, loading or refreshing one of them — or opening a shared link —
+# returns Netlify's 404 instead of the app. Status 200 rewrites (rather than
+# redirecting), so the URL the visitor asked for is what the router sees.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# --- Security headers ------------------------------------------------------
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
+# --- Caching ---------------------------------------------------------------
+# Vite fingerprints filenames under assets/, so they can be cached hard.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# index.html must never be cached, or visitors keep loading an old build that
+# points at asset filenames which no longer exist.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache, must-revalidate"

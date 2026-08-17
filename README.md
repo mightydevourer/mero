@@ -117,6 +117,54 @@ npm run preview  # serve the production build
 
 ---
 
+## Deploying to Netlify
+
+Netlify builds the site itself from the repository, or takes a folder you drop
+on it. Either way it needs one thing beyond the files: a rule telling it that
+`/study/courses` is a client-side route, not a missing file.
+
+### Option A — connect the Git repository (recommended)
+
+Netlify reads `netlify.toml` at the repo root and needs no manual settings:
+build command `npm run build`, publish directory `dist`, Node 20 pinned so a
+platform default cannot shift the build. Every push redeploys.
+
+### Option B — drag and drop
+
+Build locally, then drag the **`dist` folder** onto Netlify's deploy area:
+
+```bash
+npm ci
+npm run build
+```
+
+A dropped folder never sees `netlify.toml` — that file sits at the repo root,
+outside `dist`. The SPA rule is therefore duplicated in `public/_redirects`,
+which Vite copies into `dist/`, so this path works too.
+
+### The redirect rule
+
+```
+/*    /index.html    200
+```
+
+Status **200 rewrites** rather than redirecting, so the router still sees the
+URL the visitor asked for — `/study/courses` stays `/study/courses` in the
+address bar. A 301 would rewrite it to `/` and lose the route.
+
+`netlify.toml` also sets the security headers, caches the fingerprinted assets
+in `assets/` for a year as immutable, and marks `index.html` `no-cache` so
+visitors are never stranded on a stale build.
+
+### About the .htaccess
+
+`dist/` also contains `.htaccess`, which is Apache configuration for the
+InfinityFree path below. **Netlify ignores it entirely** — it is not a
+supported format there. It is harmless, and `_redirects` returns 404 for it so
+it is not served as plain text.
+
+---
+
 ## Deploying to InfinityFree (or any static Apache host)
 
 Mero is a pure client-side build: no PHP, no database, no server-side anything. It needs static
@@ -211,7 +259,9 @@ src/
     vocabulary/Vocabulary
     study/     StudyLayout, Dashboard, Courses, Tasks, Exams, Data, SignIn, ui
 public/
-  .htaccess                SPA rewrite, UTF-8, caching, dotfile deny (copied to dist/)
+  .htaccess                Apache: SPA rewrite, UTF-8, caching, dotfile deny
+  _redirects               Netlify: SPA rewrite (both are copied into dist/)
+netlify.toml               Netlify build settings, redirects and headers
 ```
 
 The two stores persist under separate localStorage keys (`mero-store` and `mero-study`), so
