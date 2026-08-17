@@ -1,10 +1,13 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useStudyStore } from '../../store/useStudyStore'
 import { useToast } from '../../lib/toast'
+import { useI18n, type StringKey } from '../../i18n'
 import { Field } from './ui'
 import { TrashIcon } from '../Icons'
 
 export default function SignIn() {
+  const { t } = useI18n()
   const students = useStudyStore((s) => s.students)
   const signUp = useStudyStore((s) => s.signUp)
   const signIn = useStudyStore((s) => s.signIn)
@@ -14,39 +17,38 @@ export default function SignIn() {
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  // A key rather than a resolved string, so a validation message already on
+  // screen re-renders in the new language when the switcher is used.
+  const [error, setError] = useState<StringKey | null>(null)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const trimmedName = name.trim()
     const trimmedEmail = email.trim().toLowerCase()
 
-    if (!trimmedName) return setError('Enter your name.')
+    if (!trimmedName) return setError('signin.errName')
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-      return setError('Enter a valid email address.')
+      return setError('signin.errEmail')
     }
     if (students.some((s) => s.email === trimmedEmail)) {
-      return setError('A profile with that email already exists on this device.')
+      return setError('signin.errDuplicate')
     }
 
     const student = signUp(trimmedName, trimmedEmail)
-    showToast(`Welcome, ${student.name.split(' ')[0]}`)
+    showToast(t('signin.welcome', { name: student.name.split(' ')[0] }))
   }
 
   return (
     <div className="signin">
       <div className="signin-intro">
-        <h1>Study Organizer</h1>
-        <p>
-          Keep your courses, timetable, assignments, exams and daily study tasks in one place —
-          alongside the texts you read in Mero.
-        </p>
+        <h1>{t('signin.title')}</h1>
+        <p>{t('signin.intro')}</p>
       </div>
 
       <div className="signin-grid">
         <form className="signin-card" onSubmit={submit}>
-          <h2>Create your profile</h2>
-          <Field label="Full name">
+          <h2>{t('signin.create')}</h2>
+          <Field label={t('signin.name')}>
             <input
               className="input"
               value={name}
@@ -54,43 +56,50 @@ export default function SignIn() {
                 setName(e.target.value)
                 setError(null)
               }}
-              placeholder="Alex Moreau"
+              placeholder={t('signin.namePlaceholder')}
               autoComplete="name"
             />
           </Field>
-          <Field label="Email">
+          <Field label={t('signin.email')}>
             <input
               className="input"
               type="email"
+              // Addresses stay LTR so the domain does not visually reorder
+              // inside an Arabic (RTL) form.
+              dir="ltr"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value)
                 setError(null)
               }}
-              placeholder="alex@university.edu"
+              placeholder={t('signin.emailPlaceholder')}
               autoComplete="email"
             />
           </Field>
-          {error && <p className="form-error">{error}</p>}
+          {error && <p className="form-error">{t(error)}</p>}
           <button className="btn btn-primary" type="submit">
-            Create profile
+            {t('signin.submit')}
           </button>
           <button
             type="button"
             className="btn btn-ghost"
             onClick={() => {
               const student = loadSampleProfile()
-              showToast(`Loaded ${student.name}'s semester`)
+              showToast(t('signin.sampleLoaded', { name: student.name }))
             }}
           >
-            Explore with sample data
+            {t('signin.sample')}
           </button>
+          {/* The way back in on a new device, or after clearing this one. */}
+          <Link to="/study/data" className="signin-restore">
+            {t('signin.restoreLink')}
+          </Link>
         </form>
 
         <div className="signin-card">
           {students.length > 0 ? (
             <>
-              <h2>Continue as</h2>
+              <h2>{t('signin.continueAs')}</h2>
               <ul className="profile-list">
                 {students.map((s) => (
                   <li key={s.id}>
@@ -100,15 +109,15 @@ export default function SignIn() {
                       </span>
                       <span className="profile-id">
                         <strong>{s.name}</strong>
-                        <span>{s.email}</span>
+                        <span dir="ltr">{s.email}</span>
                       </span>
                     </button>
                     <button
                       className="icon-btn"
-                      aria-label={`Delete ${s.name}'s profile`}
+                      aria-label={t('signin.deleteProfile', { name: s.name })}
                       onClick={() => {
                         removeStudent(s.id)
-                        showToast('Profile deleted')
+                        showToast(t('signin.profileDeleted'))
                       }}
                     >
                       <TrashIcon />
@@ -119,21 +128,14 @@ export default function SignIn() {
             </>
           ) : (
             <>
-              <h2>No profiles yet</h2>
-              <p className="muted-copy">
-                Create one to start adding courses, or load the sample semester to see every
-                feature with realistic data.
-              </p>
+              <h2>{t('signin.noProfiles')}</h2>
+              <p className="muted-copy">{t('signin.noProfilesBody')}</p>
             </>
           )}
 
           <div className="notice">
-            <strong>Stored on this device only</strong>
-            <p>
-              Mero runs entirely in your browser, so a profile separates your data locally rather
-              than signing you in to a server — no password is asked for, and none is stored.
-              Shared or public computers will keep whatever you enter here.
-            </p>
+            <strong>{t('signin.noticeTitle')}</strong>
+            <p>{t('signin.noticeBody')}</p>
           </div>
         </div>
       </div>

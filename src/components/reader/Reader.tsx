@@ -483,7 +483,10 @@ function ReaderView({ book }: { book: Book }) {
   )
 
   return (
-    <div className={'reader' + (immersive ? ' immersive' : '')}>
+    // Pinned to LTR even when the interface is Arabic: paged mode lays the text
+    // out in CSS columns and scrolls them with translateX, and the ←/→ keys and
+    // tap zones are wired to that axis. The books themselves are LTR too.
+    <div className={'reader' + (immersive ? ' immersive' : '')} dir="ltr">
       <div className="reader-progressline" style={{ width: `${book.progress.percent}%` }} />
 
       <header className="reader-topbar">

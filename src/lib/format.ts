@@ -31,11 +31,6 @@ export function relativeTime(ts?: number): string {
   return new Date(ts).toLocaleDateString()
 }
 
-/** '1 exam' / '2 exams' — pass `plural` for irregular nouns. */
-export function pluralize(n: number, singular: string, plural = `${singular}s`): string {
-  return `${n} ${n === 1 ? singular : plural}`
-}
-
 /** First sentence (or a trimmed slice) of a paragraph, for compact previews. */
 export function snippet(text: string, max = 140): string {
   const clean = text.replace(/\s+/g, ' ').trim()

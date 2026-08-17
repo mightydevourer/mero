@@ -1,20 +1,14 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useCourseMap, useCourses, useExams, useStudyStore } from '../../store/useStudyStore'
 import type { Exam } from '../../types'
-import {
-  byDate,
-  countdownLabel,
-  daysUntil,
-  formatDateLong,
-  formatTime,
-  todayISO,
-} from '../../lib/date'
-import { pluralize } from '../../lib/format'
+import { byDate, daysUntil, todayISO } from '../../lib/date'
 import { useToast } from '../../lib/toast'
+import { useI18n } from '../../i18n'
 import { PlusIcon, TrashIcon } from '../Icons'
 import { CourseChip, Field, Modal, SectionEmpty } from './ui'
 
 function ExamForm({ exam, onClose }: { exam?: Exam; onClose: () => void }) {
+  const { t } = useI18n()
   const courses = useCourses()
   const addExam = useStudyStore((s) => s.addExam)
   const updateExam = useStudyStore((s) => s.updateExam)
@@ -29,32 +23,34 @@ function ExamForm({ exam, onClose }: { exam?: Exam; onClose: () => void }) {
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!courseId) return setError('Pick the course this exam belongs to.')
-    if (!date) return setError('Set the exam date.')
+    if (!courseId) return setError(t('examForm.errCourse'))
+    if (!date) return setError(t('examForm.errDate'))
 
     const course = courses.find((c) => c.id === courseId)
     const payload = {
       courseId,
       // Fall back to the course name so the list never shows an untitled row.
-      title: title.trim() || `${course?.name ?? 'Course'} exam`,
+      title:
+        title.trim() ||
+        t('exams.defaultTitle', { course: course?.name ?? t('examForm.course') }),
       date,
       time: time || undefined,
       location: location.trim() || undefined,
     }
     if (exam) {
       updateExam(exam.id, payload)
-      showToast('Exam updated')
+      showToast(t('examForm.updated'))
     } else {
       addExam(payload)
-      showToast('Exam added')
+      showToast(t('examForm.added'))
     }
     onClose()
   }
 
   return (
-    <Modal title={exam ? 'Edit exam' : 'Add exam'} onClose={onClose}>
+    <Modal title={t(exam ? 'examForm.editTitle' : 'examForm.addTitle')} onClose={onClose}>
       <form className="form" onSubmit={submit}>
-        <Field label="Course">
+        <Field label={t('examForm.course')}>
           <select
             className="select"
             value={courseId}
@@ -70,17 +66,17 @@ function ExamForm({ exam, onClose }: { exam?: Exam; onClose: () => void }) {
             ))}
           </select>
         </Field>
-        <Field label="Title" hint="Optional — defaults to the course name.">
+        <Field label={t('examForm.title')} hint={t('examForm.titleHint')}>
           <input
             className="input"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Midterm"
+            placeholder={t('examForm.titlePlaceholder')}
             autoFocus
           />
         </Field>
         <div className="form-row">
-          <Field label="Date">
+          <Field label={t('examForm.date')}>
             <input
               className="input"
               type="date"
@@ -91,7 +87,7 @@ function ExamForm({ exam, onClose }: { exam?: Exam; onClose: () => void }) {
               }}
             />
           </Field>
-          <Field label="Time" hint="Optional.">
+          <Field label={t('examForm.time')} hint={t('form.optional')}>
             <input
               className="input"
               type="time"
@@ -100,21 +96,21 @@ function ExamForm({ exam, onClose }: { exam?: Exam; onClose: () => void }) {
             />
           </Field>
         </div>
-        <Field label="Room" hint="Optional.">
+        <Field label={t('examForm.room')} hint={t('form.optional')}>
           <input
             className="input"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="Exam Hall 1"
+            placeholder={t('examForm.roomPlaceholder')}
           />
         </Field>
         {error && <p className="form-error">{error}</p>}
         <div className="form-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Cancel
+            {t('form.cancel')}
           </button>
           <button type="submit" className="btn btn-primary">
-            {exam ? 'Save changes' : 'Add exam'}
+            {t(exam ? 'form.save' : 'exams.add')}
           </button>
         </div>
       </form>
@@ -124,6 +120,7 @@ function ExamForm({ exam, onClose }: { exam?: Exam; onClose: () => void }) {
 
 /** One exam card. Reused by the dashboard. */
 export function ExamCard({ exam, onEdit }: { exam: Exam; onEdit?: (exam: Exam) => void }) {
+  const { t, fmt } = useI18n()
   const courseMap = useCourseMap()
   const removeExam = useStudyStore((s) => s.removeExam)
   const showToast = useToast((s) => s.show)
@@ -136,31 +133,35 @@ export function ExamCard({ exam, onEdit }: { exam: Exam; onEdit?: (exam: Exam) =
     <div className={'exam-card' + (past ? ' past' : '') + (imminent ? ' imminent' : '')}>
       <div className="exam-date">
         <span className="exam-countdown">
-          {past ? 'Done' : days === 0 ? 'Today' : `${days}d`}
+          {past
+            ? t('exams.done')
+            : days === 0
+              ? t('date.today')
+              : t('exams.countdownShort', { n: days ?? 0 })}
         </span>
       </div>
       <div className="exam-body">
         <h3>{exam.title}</h3>
         <div className="exam-meta">
           <CourseChip course={courseMap.get(exam.courseId)} />
-          <span>{formatDateLong(exam.date)}</span>
-          {exam.time && <span>· {formatTime(exam.time)}</span>}
-          {exam.location && <span>· {exam.location}</span>}
+          <bdi>{fmt.dateLong(exam.date)}</bdi>
+          {exam.time && <bdi>· {fmt.time(exam.time)}</bdi>}
+          {exam.location && <bdi>· {exam.location}</bdi>}
         </div>
-        {!past && <p className="exam-due">{countdownLabel(exam.date)}</p>}
+        {!past && <p className="exam-due">{fmt.countdown(exam.date)}</p>}
       </div>
       <div className="exam-actions">
         {onEdit && (
           <button className="btn btn-ghost btn-sm" onClick={() => onEdit(exam)}>
-            Edit
+            {t('tasks.edit')}
           </button>
         )}
         <button
           className="icon-btn"
-          aria-label={`Delete ${exam.title}`}
+          aria-label={t('exams.deleteAria', { title: exam.title })}
           onClick={() => {
             removeExam(exam.id)
-            showToast('Exam deleted')
+            showToast(t('examForm.deleted'))
           }}
         >
           <TrashIcon />
@@ -171,6 +172,7 @@ export function ExamCard({ exam, onEdit }: { exam: Exam; onEdit?: (exam: Exam) =
 }
 
 export default function Exams() {
+  const { t, tn } = useI18n()
   const exams = useExams()
   const courses = useCourses()
   const [form, setForm] = useState<{ open: boolean; exam?: Exam }>({ open: false })
@@ -191,28 +193,26 @@ export default function Exams() {
     <div className="study-page">
       <div className="page-head study-head">
         <div>
-          <h1>Exams</h1>
+          <h1>{t('exams.title')}</h1>
           <p>
             {upcoming.length === 0
-              ? 'Record exam dates so the dashboard can count down to them.'
-              : `${pluralize(upcoming.length, 'exam')} ahead.`}
+              ? t('exams.subtitleEmpty')
+              : tn('exams.ahead', upcoming.length)}
           </p>
         </div>
         <button
           className="btn btn-primary"
           disabled={courses.length === 0}
-          title={courses.length === 0 ? 'Add a course first' : undefined}
+          title={courses.length === 0 ? t('courses.addFirst') : undefined}
           onClick={() => setForm({ open: true })}
         >
-          <PlusIcon /> Add exam
+          <PlusIcon /> {t('exams.add')}
         </button>
       </div>
 
       {exams.length === 0 ? (
-        <SectionEmpty title="No exams recorded">
-          {courses.length === 0
-            ? 'Add a course first — every exam belongs to one.'
-            : 'Add an exam date and it will appear on your dashboard.'}
+        <SectionEmpty title={t('exams.empty')}>
+          {courses.length === 0 ? t('exams.emptyNoCourses') : t('exams.emptyBody')}
         </SectionEmpty>
       ) : (
         <>
@@ -225,7 +225,7 @@ export default function Exams() {
           )}
           {past.length > 0 && (
             <>
-              <h2 className="subhead">Past</h2>
+              <h2 className="subhead">{t('exams.past')}</h2>
               <div className="exam-list">
                 {past.map((e) => (
                   <ExamCard key={e.id} exam={e} onEdit={edit} />

@@ -1,0 +1,120 @@
+# ===========================================================================
+# Mero — Apache configuration for static hosting (InfinityFree and similar)
+#
+# This file is copied verbatim into dist/ by Vite (everything in public/ is),
+# so it ends up beside index.html when you upload the build to htdocs/.
+#
+# Its main job is SPA routing. Mero is a single-page app: /study, /study/courses
+# and /read/<id> exist only in the browser's router, not on disk. Without the
+# rewrite below, loading or refreshing one of those URLs directly — or following
+# a shared link — returns Apache's 404 instead of the app.
+# ===========================================================================
+
+# If the host returns "500 Internal Server Error" after upload, its
+# AllowOverride does not permit `Options` in .htaccess: delete the two
+# `Options` lines below (-MultiViews here and -Indexes at the end of the file).
+# Everything else in this file works without them.
+
+# MultiViews lets Apache answer /study with a file called study.*; turn it off
+# so the rewrite decides instead.
+<IfModule mod_negotiation.c>
+  Options -MultiViews
+</IfModule>
+
+# --- Protect dotfiles ------------------------------------------------------
+# The rewrite below deliberately serves anything that exists on disk, and this
+# file exists on disk — so without this block a visitor can read the server
+# configuration by requesting /.htaccess directly. Apache's stock config denies
+# .ht* globally, but a shared host's may not, so it is repeated here.
+<FilesMatch "^\.(?i:ht.*|env.*|git.*)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # If the app is published in a subdirectory, change this to match
+  # (e.g. RewriteBase /mero/) and build with VITE_BASE=/mero/.
+  RewriteBase /
+
+  # Never rewrite a request that maps to a real file or directory: this is what
+  # keeps /assets/index-*.js, /mero.svg and the favicon serving normally.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Everything else is a client-side route: hand back the SPA entry point.
+  # index.html is served for the *original* URL, so the router still sees the
+  # path the visitor asked for.
+  RewriteRule . index.html [L]
+</IfModule>
+
+# --- MIME types ------------------------------------------------------------
+# Shared hosts are often missing the newer ones, which makes browsers refuse
+# module scripts and skip modern image and font formats.
+<IfModule mod_mime.c>
+  AddType application/javascript            js mjs
+  AddType text/css                          css
+  AddType application/json                  json
+  AddType image/svg+xml                     svg svgz
+  AddType image/webp                        webp
+  AddType image/avif                        avif
+  AddType font/woff2                        woff2
+  AddType application/manifest+json         webmanifest
+</IfModule>
+
+# --- Character set ---------------------------------------------------------
+# Mero ships Arabic, Spanish, French and German copy. Declare UTF-8 explicitly
+# rather than relying on the host default, or that text arrives mojibaked.
+AddDefaultCharset UTF-8
+<IfModule mod_mime.c>
+  AddCharset UTF-8 .html .css .js .mjs .json .svg
+</IfModule>
+
+# --- Compression -----------------------------------------------------------
+<IfModule mod_deflate.c>
+  <IfModule mod_filter.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml
+    AddOutputFilterByType DEFLATE application/javascript application/json
+    AddOutputFilterByType DEFLATE image/svg+xml application/manifest+json
+  </IfModule>
+</IfModule>
+
+# --- Caching ---------------------------------------------------------------
+# Vite fingerprints filenames under assets/, so those are safe to cache hard.
+# index.html must never be cached, or visitors keep loading an old build that
+# points at asset filenames which no longer exist.
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresDefault                            "access plus 1 day"
+  ExpiresByType text/css                    "access plus 1 year"
+  ExpiresByType application/javascript      "access plus 1 year"
+  ExpiresByType image/svg+xml               "access plus 1 month"
+  ExpiresByType font/woff2                  "access plus 1 year"
+  ExpiresByType text/html                   "access plus 0 seconds"
+</IfModule>
+
+<IfModule mod_headers.c>
+  <FilesMatch "\.(js|mjs|css|woff2)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+  # Mero stores a student's coursework in localStorage and talks to no backend;
+  # these keep other sites from framing it or sniffing the declared types.
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# --- Directory listing -----------------------------------------------------
+<IfModule mod_autoindex.c>
+  Options -Indexes
+</IfModule>

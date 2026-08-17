@@ -1,24 +1,17 @@
 /**
- * Date helpers for the Study Organizer.
+ * Date maths and locale formatting for the Study Organizer.
  *
  * Calendar dates are stored as 'YYYY-MM-DD' and times as 'HH:MM' — the same
  * shapes a MySQL DATE / TIME column would hold. Everything is interpreted in
  * the reader's local timezone: `new Date('2026-08-25')` parses as UTC midnight
  * and can land on the previous day west of Greenwich, so dates are always
  * split and rebuilt through the local-time constructor instead.
+ *
+ * Nothing here produces user-facing words. Weekday names, countdowns and the
+ * "no date" fallbacks are translated copy and live in `src/i18n`; these
+ * functions take a BCP-47 tag and return `null` when a value cannot be parsed,
+ * leaving the wording to the caller.
  */
-
-export const WEEKDAYS = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-] as const
-
-export const WEEKDAYS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
 const DAY_MS = 86_400_000
 
@@ -62,12 +55,20 @@ export function isOverdue(iso: string | undefined): boolean {
   return d !== null && d < 0
 }
 
+/**
+ * Options shared by every date format. Arabic locales in some ICU builds
+ * default to a Hijri calendar; university deadlines are Gregorian, so the
+ * calendar is pinned rather than left to the locale.
+ */
+const CALENDAR = { calendar: 'gregory' } as const
+
 /** 'Aug 25' — or 'Aug 25, 2027' when the date falls outside the current year. */
-export function formatDate(iso: string | undefined): string {
+export function formatDate(iso: string | undefined, locale?: string): string | null {
   const date = parseDate(iso)
-  if (!date) return 'No date'
+  if (!date) return null
   const sameYear = date.getFullYear() === new Date().getFullYear()
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(locale, {
+    ...CALENDAR,
     month: 'short',
     day: 'numeric',
     ...(sameYear ? {} : { year: 'numeric' }),
@@ -75,46 +76,25 @@ export function formatDate(iso: string | undefined): string {
 }
 
 /** 'Mon, Aug 25' — the long form used in list rows and detail headers. */
-export function formatDateLong(iso: string | undefined): string {
+export function formatDateLong(iso: string | undefined, locale?: string): string | null {
   const date = parseDate(iso)
-  if (!date) return 'No date'
-  return date.toLocaleDateString(undefined, {
+  if (!date) return null
+  return date.toLocaleDateString(locale, {
+    ...CALENDAR,
     weekday: 'short',
     month: 'short',
     day: 'numeric',
   })
 }
 
-/** '09:00' → '9:00 AM', honouring the reader's locale clock. */
-export function formatTime(time: string | undefined): string {
-  if (!time) return ''
+/** '09:00' → '9:00 AM' (or '٩:٠٠ ص'), honouring the locale's clock. */
+export function formatTime(time: string | undefined, locale?: string): string | null {
+  if (!time) return null
   const m = /^(\d{1,2}):(\d{2})$/.exec(time)
   if (!m) return time
   const date = new Date()
   date.setHours(Number(m[1]), Number(m[2]), 0, 0)
-  return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
-}
-
-/** Human countdown for a deadline: 'Due in 5 days', 'Due today', 'Overdue by 2 days'. */
-export function dueLabel(iso: string | undefined): string {
-  const days = daysUntil(iso)
-  if (days === null) return 'No deadline'
-  if (days === 0) return 'Due today'
-  if (days === 1) return 'Due tomorrow'
-  if (days === -1) return 'Overdue by 1 day'
-  if (days < 0) return `Overdue by ${-days} days`
-  return `Due in ${days} days`
-}
-
-/** Neutral countdown for dated events: 'In 8 days', 'Today', '3 days ago'. */
-export function countdownLabel(iso: string | undefined): string {
-  const days = daysUntil(iso)
-  if (days === null) return 'No date'
-  if (days === 0) return 'Today'
-  if (days === 1) return 'Tomorrow'
-  if (days === -1) return 'Yesterday'
-  if (days < 0) return `${-days} days ago`
-  return `In ${days} days`
+  return date.toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' })
 }
 
 /** Sort comparator putting the soonest date first; undated entries sink. */

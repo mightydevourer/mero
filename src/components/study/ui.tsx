@@ -1,20 +1,17 @@
 import { useEffect, type ReactNode } from 'react'
 import type { Course, Priority } from '../../types'
+import { useI18n } from '../../i18n'
 import { CloseIcon } from '../Icons'
 
-const PRIORITY_LABEL: Record<Priority, string> = {
-  high: 'High',
-  medium: 'Medium',
-  low: 'Low',
-}
-
 export function PriorityBadge({ priority }: { priority: Priority }) {
-  return <span className={`badge badge-${priority}`}>{PRIORITY_LABEL[priority]}</span>
+  const { t } = useI18n()
+  return <span className={`badge badge-${priority}`}>{t(`priority.${priority}`)}</span>
 }
 
 /** Course name prefixed with its tint; falls back to a neutral 'General' chip. */
 export function CourseChip({ course }: { course?: Course }) {
-  if (!course) return <span className="course-chip course-chip-none">General</span>
+  const { t } = useI18n()
+  if (!course) return <span className="course-chip course-chip-none">{t('course.none')}</span>
   return (
     <span className="course-chip">
       <span className="course-dot" style={{ background: course.color }} />
@@ -39,17 +36,19 @@ export function ProgressBar({ percent }: { percent: number }) {
 
 /** Circular completion meter used on the dashboard. */
 export function ProgressRing({ percent, size = 116 }: { percent: number; size?: number }) {
+  const { fmt } = useI18n()
   const stroke = 10
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius
   const offset = circumference * (1 - percent / 100)
+  const label = fmt.percent(percent)
   return (
     <svg
       width={size}
       height={size}
       className="progress-ring"
       role="img"
-      aria-label={`${percent}% of tasks complete`}
+      aria-label={label}
     >
       <circle
         cx={size / 2}
@@ -78,7 +77,7 @@ export function ProgressRing({ percent, size = 116 }: { percent: number; size?: 
         dominantBaseline="central"
         className="progress-ring-text"
       >
-        {percent}%
+        {label}
       </text>
     </svg>
   )
@@ -121,6 +120,8 @@ export function Modal({
   onClose: () => void
   children: ReactNode
 }) {
+  const { t } = useI18n()
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -145,7 +146,7 @@ export function Modal({
       >
         <div className="modal-head">
           <h2>{title}</h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
+          <button className="icon-btn" onClick={onClose} aria-label={t('form.close')}>
             <CloseIcon />
           </button>
         </div>

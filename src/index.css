@@ -306,7 +306,7 @@ button {
 .nav-links {
   display: flex;
   gap: 4px;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 .nav-link {
   padding: 8px 15px;
@@ -326,7 +326,7 @@ button {
   box-shadow: var(--shadow-1);
 }
 .nav-count {
-  margin-left: 7px;
+  margin-inline-start: 7px;
   padding: 1px 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 16%, transparent);
@@ -974,7 +974,7 @@ mark.hl.has-note {
   padding: 14px 16px;
   background: var(--surface-2);
   border-radius: var(--radius);
-  border-left: 3px solid var(--accent);
+  border-inline-start: 3px solid var(--accent);
 }
 .sheet-translation {
   font-size: 19px;
@@ -1015,7 +1015,7 @@ mark.hl.has-note {
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   vertical-align: -2px;
-  margin-right: 8px;
+  margin-inline-end: 8px;
 }
 @keyframes spin {
   to {
@@ -1042,7 +1042,7 @@ mark.hl.has-note {
   z-index: 46;
   width: min(360px, 100%);
   background: var(--surface);
-  border-left: 1px solid var(--border);
+  border-inline-start: 1px solid var(--border);
   box-shadow: var(--shadow-2);
   padding: 22px;
   overflow-y: auto;
@@ -1207,7 +1207,7 @@ input[type='range'] {
 .popover-item {
   display: block;
   width: 100%;
-  text-align: left;
+  text-align: start;
   padding: 9px 12px;
   border: none;
   background: transparent;
@@ -1322,7 +1322,7 @@ input[type='range'] {
 .export-menu {
   position: absolute;
   top: calc(100% + 6px);
-  right: 0;
+  inset-inline-end: 0;
   z-index: 30;
   min-width: 240px;
   background: var(--surface);
@@ -1337,7 +1337,7 @@ input[type='range'] {
   align-items: flex-start;
   gap: 2px;
   width: 100%;
-  text-align: left;
+  text-align: start;
   padding: 10px 12px;
   border: none;
   background: transparent;
@@ -1458,7 +1458,7 @@ input[type='range'] {
   display: flex;
   align-items: center;
   gap: 9px;
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 .study-profile-name {
   font-weight: 600;
@@ -1562,7 +1562,7 @@ input[type='range'] {
   font-size: 14px;
   color: var(--muted);
   min-width: 42px;
-  text-align: right;
+  text-align: end;
 }
 .progress-ring-text {
   fill: var(--text-strong);
@@ -1807,7 +1807,7 @@ input[type='range'] {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface-2);
-  text-align: left;
+  text-align: start;
   transition: border-color var(--speed);
 }
 .profile-row:hover {
@@ -1857,7 +1857,8 @@ input[type='range'] {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 18px 18px 14px 22px;
+  padding: 18px 18px 14px;
+  padding-inline-start: 22px;
   border-radius: var(--radius);
   border: 1px solid var(--border);
   background: var(--surface);
@@ -1866,7 +1867,7 @@ input[type='range'] {
 }
 .course-stripe {
   position: absolute;
-  left: 0;
+  inset-inline-start: 0;
   top: 0;
   bottom: 0;
   width: 5px;
@@ -1933,7 +1934,7 @@ input[type='range'] {
   position: relative;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
+  border-inline-start: 3px solid var(--border);
   background: var(--surface);
 }
 .slot-main {
@@ -1941,10 +1942,11 @@ input[type='range'] {
   flex-direction: column;
   gap: 2px;
   width: 100%;
-  padding: 9px 22px 9px 10px;
+  padding: 9px 10px;
+  padding-inline-end: 22px;
   border: 0;
   background: none;
-  text-align: left;
+  text-align: start;
   border-radius: inherit;
 }
 .slot-main strong {
@@ -1961,7 +1963,7 @@ input[type='range'] {
 .slot-remove {
   position: absolute;
   top: 4px;
-  right: 4px;
+  inset-inline-end: 4px;
   width: 20px;
   height: 20px;
   padding: 0;
@@ -2020,7 +2022,7 @@ input[type='range'] {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 .task-row.overdue {
-  border-left: 3px solid var(--pri-high);
+  border-inline-start: 3px solid var(--pri-high);
 }
 .task-row.done {
   opacity: 0.58;
@@ -2292,7 +2294,7 @@ input[type='range'] {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
 }
 .deadline-row.overdue {
-  border-left: 3px solid var(--pri-high);
+  border-inline-start: 3px solid var(--pri-high);
 }
 .deadline-dot {
   font-size: 12px;
@@ -2330,7 +2332,7 @@ input[type='range'] {
   padding: 10px 13px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--border);
+  border-inline-start: 3px solid var(--border);
   background: var(--surface);
 }
 .class-time {
@@ -2383,9 +2385,235 @@ input[type='range'] {
   .task-side {
     width: 100%;
     justify-content: flex-start;
-    padding-left: 34px;
+    padding-inline-start: 34px;
   }
   .study-profile {
-    margin-left: 0;
+    margin-inline-start: 0;
   }
+}
+
+/* ==========================================================================
+   Internationalisation — language switcher, Arabic typography, RTL fixes
+   ========================================================================== */
+
+.lang-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  flex: none;
+}
+.lang-option {
+  padding: 5px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.4;
+  transition: background var(--speed), color var(--speed);
+}
+.lang-option:hover {
+  color: var(--text);
+}
+.lang-option.active {
+  background: var(--surface);
+  color: var(--accent);
+  box-shadow: var(--shadow-1);
+}
+
+/* The brand, links and switcher no longer fit on one row on a phone, so the
+   bar is allowed to wrap and the switcher keeps hugging the end edge when it
+   drops to a second line. Without this the switcher is pushed off-canvas. */
+.nav-inner {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .nav-inner {
+    padding: 12px 16px;
+    gap: 12px;
+    row-gap: 10px;
+  }
+  .lang-switch {
+    margin-inline-start: auto;
+  }
+}
+
+/* --- Arabic typography ---------------------------------------------------- */
+
+/* Arabic has no small-caps or letter case, and its glyphs need a little more
+   vertical room than the Latin stack allows. */
+[lang='ar'] {
+  --font-sans: 'SF Arabic', 'Segoe UI', 'Noto Naskh Arabic', 'Noto Sans Arabic',
+    'Geeza Pro', 'Dubai', Tahoma, Arial, sans-serif;
+}
+[lang='ar'] body {
+  font-family: var(--font-sans);
+  line-height: 1.65;
+}
+[lang='ar'] .week-day-short,
+[lang='ar'] .stat-label,
+[lang='ar'] .badge,
+[lang='ar'] .subhead {
+  text-transform: none;
+  letter-spacing: 0;
+}
+/* Arabic-Indic digits sit taller than Latin ones; the ring text needs the
+   extra room so descenders are not clipped by the SVG viewport. */
+[lang='ar'] .progress-ring-text {
+  font-size: 21px;
+}
+
+/* --- RTL corrections ------------------------------------------------------ */
+
+/* `.progress-fill` is a block child of `.progress-track`, so its inline-start
+   edge already follows the direction — it grows leftward under RTL with no
+   rule of its own. */
+
+/* Keep a link's trailing arrow on the same line as its label. */
+[dir='rtl'] .dash-head a {
+  white-space: nowrap;
+}
+
+/* Times, dates and codes are isolated runs inside Arabic sentences. */
+.slot-time,
+.class-time,
+.exam-meta,
+.task-due {
+  unicode-bidi: isolate;
+}
+
+/* Latin course codes inside an RTL row keep their own direction so a code like
+   'CS-204' does not render as '204-CS'. */
+[dir='rtl'] .course-chip,
+[dir='rtl'] .tag {
+  unicode-bidi: isolate;
+}
+
+/* ==========================================================================
+   Data: backup, restore & reset
+   ========================================================================== */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.btn-danger {
+  background: var(--pri-high);
+  border-color: var(--pri-high);
+  color: #fff;
+}
+.btn-danger:hover {
+  background: var(--pri-high);
+  filter: brightness(1.07);
+}
+.btn:disabled,
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: none;
+}
+.btn:disabled:active {
+  transform: none;
+}
+
+.data-summary {
+  margin-bottom: 22px;
+  padding: 11px 15px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.data-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.data-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px 22px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+.data-card h2 {
+  font-size: 16px;
+  color: var(--text-strong);
+}
+.data-card p {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.data-card.danger {
+  border-color: color-mix(in srgb, var(--pri-high) 40%, var(--border));
+  background: color-mix(in srgb, var(--pri-high) 5%, var(--surface));
+}
+.danger-label {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--pri-high) 16%, transparent);
+  color: var(--pri-high);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+[lang='ar'] .danger-label {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.data-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+.data-note {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.notice-warn {
+  background: color-mix(in srgb, var(--pri-high) 10%, transparent);
+  border-color: color-mix(in srgb, var(--pri-high) 35%, transparent);
+}
+.notice-warn p {
+  color: var(--text);
+  margin-top: 0;
+}
+
+/* Escape hatch on the profile gate: restore works with no profile selected. */
+.signin-restore {
+  align-self: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.signin-restore:hover {
+  text-decoration: underline;
 }

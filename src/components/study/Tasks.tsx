@@ -1,8 +1,9 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { useCourseMap, useCourses, useStudyStore, useTasks } from '../../store/useStudyStore'
 import type { Priority, Task, TaskKind } from '../../types'
-import { dueLabel, formatDateLong, isOverdue, isToday, todayISO } from '../../lib/date'
+import { isOverdue, isToday, todayISO } from '../../lib/date'
 import { useToast } from '../../lib/toast'
+import { useI18n, type StringKey } from '../../i18n'
 import { CheckIcon, PlusIcon, TrashIcon } from '../Icons'
 import { CourseChip, Field, Modal, PriorityBadge, ProgressBar, SectionEmpty } from './ui'
 
@@ -34,6 +35,7 @@ function TaskForm({
   defaultKind: TaskKind
   onClose: () => void
 }) {
+  const { t } = useI18n()
   const courses = useCourses()
   const addTask = useStudyStore((s) => s.addTask)
   const updateTask = useStudyStore((s) => s.updateTask)
@@ -50,7 +52,7 @@ function TaskForm({
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const trimmed = title.trim()
-    if (!trimmed) return setError('Give it a title.')
+    if (!trimmed) return setError(t('taskForm.errTitle'))
 
     const payload = {
       kind,
@@ -62,36 +64,40 @@ function TaskForm({
     }
     if (task) {
       updateTask(task.id, payload)
-      showToast('Saved')
+      showToast(t('taskForm.saved'))
     } else {
       addTask(payload)
-      showToast(kind === 'assignment' ? 'Assignment added' : 'Task added')
+      showToast(t(kind === 'assignment' ? 'taskForm.assignmentAdded' : 'taskForm.taskAdded'))
     }
     onClose()
   }
 
+  const modalTitle = task
+    ? t('taskForm.editTitle')
+    : t(kind === 'assignment' ? 'taskForm.newAssignment' : 'taskForm.newTask')
+
   return (
-    <Modal title={task ? 'Edit' : kind === 'assignment' ? 'New assignment' : 'New task'} onClose={onClose}>
+    <Modal title={modalTitle} onClose={onClose}>
       <form className="form" onSubmit={submit}>
-        <Field label="Type">
+        <Field label={t('taskForm.type')}>
           <div className="segmented">
             <button
               type="button"
               className={'segment' + (kind === 'assignment' ? ' active' : '')}
               onClick={() => setKind('assignment')}
             >
-              Assignment
+              {t('taskForm.assignment')}
             </button>
             <button
               type="button"
               className={'segment' + (kind === 'task' ? ' active' : '')}
               onClick={() => setKind('task')}
             >
-              Study task
+              {t('taskForm.task')}
             </button>
           </div>
         </Field>
-        <Field label="Title">
+        <Field label={t('taskForm.title')}>
           <input
             className="input"
             value={title}
@@ -99,27 +105,31 @@ function TaskForm({
               setTitle(e.target.value)
               setError(null)
             }}
-            placeholder={kind === 'assignment' ? 'PHP Project' : 'Review PDO prepared statements'}
+            placeholder={t(
+              kind === 'assignment'
+                ? 'taskForm.titleAssignmentPlaceholder'
+                : 'taskForm.titleTaskPlaceholder',
+            )}
             autoFocus
           />
         </Field>
-        <Field label="Description" hint="Optional.">
+        <Field label={t('taskForm.description')} hint={t('form.optional')}>
           <textarea
             className="input textarea"
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What exactly needs doing?"
+            placeholder={t('taskForm.descriptionPlaceholder')}
           />
         </Field>
         <div className="form-row">
-          <Field label="Course">
+          <Field label={t('taskForm.course')}>
             <select
               className="select"
               value={courseId}
               onChange={(e) => setCourseId(e.target.value)}
             >
-              <option value="">No course</option>
+              <option value="">{t('taskForm.noCourse')}</option>
               {courses.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
@@ -127,7 +137,10 @@ function TaskForm({
               ))}
             </select>
           </Field>
-          <Field label="Deadline" hint={kind === 'task' ? 'Optional.' : undefined}>
+          <Field
+            label={t('taskForm.deadline')}
+            hint={kind === 'task' ? t('form.optional') : undefined}
+          >
             <input
               className="input"
               type="date"
@@ -136,7 +149,7 @@ function TaskForm({
             />
           </Field>
         </div>
-        <Field label="Priority">
+        <Field label={t('taskForm.priority')}>
           <div className="segmented">
             {(['high', 'medium', 'low'] as Priority[]).map((p) => (
               <button
@@ -145,7 +158,7 @@ function TaskForm({
                 className={'segment' + (priority === p ? ` active priority-${p}` : '')}
                 onClick={() => setPriority(p)}
               >
-                {p[0].toUpperCase() + p.slice(1)}
+                {t(`priority.${p}` as StringKey)}
               </button>
             ))}
           </div>
@@ -153,10 +166,10 @@ function TaskForm({
         {error && <p className="form-error">{error}</p>}
         <div className="form-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Cancel
+            {t('form.cancel')}
           </button>
           <button type="submit" className="btn btn-primary">
-            {task ? 'Save changes' : 'Add'}
+            {t(task ? 'form.save' : 'form.addGeneric')}
           </button>
         </div>
       </form>
@@ -166,6 +179,7 @@ function TaskForm({
 
 /** One row in the task list. Reused by the dashboard. */
 export function TaskRow({ task, onEdit }: { task: Task; onEdit?: (task: Task) => void }) {
+  const { t, fmt } = useI18n()
   const courseMap = useCourseMap()
   const toggleTask = useStudyStore((s) => s.toggleTask)
   const removeTask = useStudyStore((s) => s.removeTask)
@@ -181,7 +195,7 @@ export function TaskRow({ task, onEdit }: { task: Task; onEdit?: (task: Task) =>
         className={'task-check' + (done ? ' checked' : '')}
         onClick={() => toggleTask(task.id)}
         aria-pressed={done}
-        aria-label={done ? `Mark “${task.title}” as not done` : `Mark “${task.title}” as done`}
+        aria-label={t(done ? 'tasks.markNotDone' : 'tasks.markDone', { title: task.title })}
       >
         {done && <CheckIcon width={14} height={14} />}
       </button>
@@ -189,14 +203,14 @@ export function TaskRow({ task, onEdit }: { task: Task; onEdit?: (task: Task) =>
       <div className="task-main">
         <div className="task-title-row">
           <span className="task-title">{task.title}</span>
-          {task.kind === 'assignment' && <span className="tag">Assignment</span>}
+          {task.kind === 'assignment' && <span className="tag">{t('taskForm.assignment')}</span>}
         </div>
         {task.description && <p className="task-desc">{task.description}</p>}
         <div className="task-meta">
           <CourseChip course={task.courseId ? courseMap.get(task.courseId) : undefined} />
           {task.deadline && (
             <span className={'task-due' + (overdue ? ' overdue' : due ? ' today' : '')}>
-              {formatDateLong(task.deadline)} · {dueLabel(task.deadline)}
+              <bdi>{fmt.dateLong(task.deadline)}</bdi> · {fmt.due(task.deadline)}
             </span>
           )}
         </div>
@@ -206,15 +220,15 @@ export function TaskRow({ task, onEdit }: { task: Task; onEdit?: (task: Task) =>
         <PriorityBadge priority={task.priority} />
         {onEdit && (
           <button className="btn btn-ghost btn-sm" onClick={() => onEdit(task)}>
-            Edit
+            {t('tasks.edit')}
           </button>
         )}
         <button
           className="icon-btn"
-          aria-label={`Delete ${task.title}`}
+          aria-label={t('tasks.deleteAria', { title: task.title })}
           onClick={() => {
             removeTask(task.id)
-            showToast('Deleted')
+            showToast(t('tasks.deleted'))
           }}
         >
           <TrashIcon />
@@ -225,6 +239,7 @@ export function TaskRow({ task, onEdit }: { task: Task; onEdit?: (task: Task) =>
 }
 
 export default function Tasks() {
+  const { t, fmt } = useI18n()
   const tasks = useTasks()
   const courses = useCourses()
   const [form, setForm] = useState<{ open: boolean; task?: Task; kind: TaskKind }>({
@@ -239,12 +254,12 @@ export default function Tasks() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return tasks
-      .filter((t) => {
-        if (kindFilter !== 'all' && t.kind !== kindFilter) return false
-        if (statusFilter === 'open' && t.status === 'done') return false
-        if (statusFilter === 'done' && t.status !== 'done') return false
-        if (courseFilter && t.courseId !== courseFilter) return false
-        if (q && !`${t.title} ${t.description ?? ''}`.toLowerCase().includes(q)) return false
+      .filter((task) => {
+        if (kindFilter !== 'all' && task.kind !== kindFilter) return false
+        if (statusFilter === 'open' && task.status === 'done') return false
+        if (statusFilter === 'done' && task.status !== 'done') return false
+        if (courseFilter && task.courseId !== courseFilter) return false
+        if (q && !`${task.title} ${task.description ?? ''}`.toLowerCase().includes(q)) return false
         return true
       })
       .sort(compareTasks)
@@ -252,76 +267,80 @@ export default function Tasks() {
 
   const stats = useMemo(() => {
     const total = tasks.length
-    const done = tasks.filter((t) => t.status === 'done').length
-    const overdue = tasks.filter((t) => t.status !== 'done' && isOverdue(t.deadline)).length
-    const today = tasks.filter((t) => t.status !== 'done' && t.deadline === todayISO()).length
+    const done = tasks.filter((task) => task.status === 'done').length
+    const overdue = tasks.filter((task) => task.status !== 'done' && isOverdue(task.deadline)).length
+    const today = tasks.filter((task) => task.status !== 'done' && task.deadline === todayISO()).length
     return { total, done, overdue, today, percent: total ? Math.round((done / total) * 100) : 0 }
   }, [tasks])
+
+  const kindFilters: [KindFilter, StringKey][] = [
+    ['all', 'tasks.filterAll'],
+    ['assignment', 'tasks.filterAssignments'],
+    ['task', 'tasks.filterTasks'],
+  ]
+  const statusFilters: [StatusFilter, StringKey][] = [
+    ['open', 'tasks.filterOpen'],
+    ['done', 'tasks.filterDone'],
+    ['all', 'tasks.filterEverything'],
+  ]
 
   return (
     <div className="study-page">
       <div className="page-head study-head">
         <div>
-          <h1>Tasks &amp; assignments</h1>
+          <h1>{t('tasks.title')}</h1>
           <p>
             {stats.total === 0
-              ? 'Coursework with deadlines, and the day-to-day study you plan around it.'
-              : `${stats.done} of ${stats.total} complete · ${stats.today} due today · ${stats.overdue} overdue`}
+              ? t('tasks.subtitle')
+              : t('tasks.summary', {
+                  done: stats.done,
+                  total: stats.total,
+                  today: stats.today,
+                  overdue: stats.overdue,
+                })}
           </p>
         </div>
         <button
           className="btn btn-primary"
           onClick={() => setForm({ open: true, kind: 'assignment' })}
         >
-          <PlusIcon /> Add
+          <PlusIcon /> {t('tasks.add')}
         </button>
       </div>
 
       {stats.total > 0 && (
         <div className="progress-inline">
           <ProgressBar percent={stats.percent} />
-          <span>{stats.percent}%</span>
+          <span>{fmt.percent(stats.percent)}</span>
         </div>
       )}
 
       <div className="study-toolbar">
         <input
           className="input search"
-          placeholder="Search tasks…"
+          placeholder={t('tasks.search')}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         <div className="filter-group">
-          {(
-            [
-              ['all', 'All'],
-              ['assignment', 'Assignments'],
-              ['task', 'Study tasks'],
-            ] as [KindFilter, string][]
-          ).map(([key, label]) => (
+          {kindFilters.map(([key, label]) => (
             <button
               key={key}
               className={'chip' + (kindFilter === key ? ' active' : '')}
               onClick={() => setKindFilter(key)}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
         <div className="filter-group">
-          {(
-            [
-              ['open', 'Open'],
-              ['done', 'Completed'],
-              ['all', 'Everything'],
-            ] as [StatusFilter, string][]
-          ).map(([key, label]) => (
+          {statusFilters.map(([key, label]) => (
             <button
               key={key}
               className={'chip' + (statusFilter === key ? ' active' : '')}
               onClick={() => setStatusFilter(key)}
             >
-              {label}
+              {t(label)}
             </button>
           ))}
         </div>
@@ -330,9 +349,9 @@ export default function Tasks() {
             className="select course-filter"
             value={courseFilter}
             onChange={(e) => setCourseFilter(e.target.value)}
-            aria-label="Filter by course"
+            aria-label={t('tasks.allCourses')}
           >
-            <option value="">All courses</option>
+            <option value="">{t('tasks.allCourses')}</option>
             {courses.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -343,18 +362,16 @@ export default function Tasks() {
       </div>
 
       {filtered.length === 0 ? (
-        <SectionEmpty title={tasks.length === 0 ? 'Nothing here yet' : 'Nothing matches'}>
-          {tasks.length === 0
-            ? 'Add an assignment with a deadline, or a study task for today.'
-            : 'Try a different filter or clear the search.'}
+        <SectionEmpty title={t(tasks.length === 0 ? 'tasks.empty' : 'tasks.noMatch')}>
+          {t(tasks.length === 0 ? 'tasks.emptyBody' : 'tasks.noMatchBody')}
         </SectionEmpty>
       ) : (
         <div className="task-list">
-          {filtered.map((t) => (
+          {filtered.map((task) => (
             <TaskRow
-              key={t.id}
-              task={t}
-              onEdit={(task) => setForm({ open: true, task, kind: task.kind })}
+              key={task.id}
+              task={task}
+              onEdit={(next) => setForm({ open: true, task: next, kind: next.kind })}
             />
           ))}
         </div>

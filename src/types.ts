@@ -141,6 +141,9 @@ export interface Exam {
   createdAt: number
 }
 
+/** Language the interface is rendered in. Arabic switches the app to RTL. */
+export type UiLanguage = 'en' | 'ar'
+
 export interface Settings {
   theme: ThemeName
   fontFamily: string
@@ -155,4 +158,6 @@ export interface Settings {
   justify: boolean
   /** Language vocabulary/translations are rendered into. */
   targetLanguage: string
+  /** Language of the interface itself (distinct from `targetLanguage`). */
+  uiLanguage: UiLanguage
 }

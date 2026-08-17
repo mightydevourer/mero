@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware'
 import type { Course, Exam, Lecture, Student, Task, TaskStatus } from '../types'
 import { uid } from '../lib/id'
 import { sampleStudyData } from '../data/seedStudy'
+import type { StudyData } from '../services/backup'
 
 interface StudyState {
   students: Student[]
@@ -42,6 +43,14 @@ interface StudyState {
   addExam: (exam: Omit<Exam, 'id' | 'studentId' | 'createdAt'>) => Exam | undefined
   updateExam: (id: string, patch: Partial<Exam>) => void
   removeExam: (id: string) => void
+
+  // Backup & reset
+  /** Snapshot of every collection, for export. */
+  exportData: () => StudyData
+  /** Replace all study data with a restored backup. */
+  replaceData: (data: StudyData) => void
+  /** Delete every profile and all their data. */
+  clearData: () => void
 }
 
 export const useStudyStore = create<StudyState>()(
@@ -179,6 +188,35 @@ export const useStudyStore = create<StudyState>()(
         set((s) => ({ exams: s.exams.map((e) => (e.id === id ? { ...e, ...patch } : e)) })),
 
       removeExam: (id) => set((s) => ({ exams: s.exams.filter((e) => e.id !== id) })),
+
+      // --- Backup & reset ------------------------------------------------
+
+      exportData: () => {
+        const { students, courses, lectures, tasks, exams } = get()
+        return { students, courses, lectures, tasks, exams }
+      },
+
+      replaceData: (data) =>
+        set({
+          students: data.students,
+          courses: data.courses,
+          lectures: data.lectures,
+          tasks: data.tasks,
+          exams: data.exams,
+          // Sign in to the restored profile when there is exactly one, so a
+          // restore lands on the dashboard rather than the profile picker.
+          currentStudentId: data.students.length === 1 ? data.students[0].id : null,
+        }),
+
+      clearData: () =>
+        set({
+          students: [],
+          courses: [],
+          lectures: [],
+          tasks: [],
+          exams: [],
+          currentStudentId: null,
+        }),
     }),
     {
       name: 'mero-study',

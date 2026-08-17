@@ -64,8 +64,45 @@ The academic half of Mero: what you have to read *by when*, next to the reading 
 - **Exams** (`/study/exams`) — exam dates per course, split into upcoming and past, counting
   down in days.
 
+- **Data** (`/study/data`) — export every profile to a JSON backup, restore one, or clear
+  everything behind a typed confirmation.
+
 Deleting a course cascades to its lectures, tasks and exams. Every course is tinted, and that
 tint follows it onto the schedule grid, task rows and dashboard.
+
+---
+
+## Languages and direction
+
+The interface ships in **English and Arabic**, switchable from the toggle in the top bar and
+persisted with the rest of the settings. Choosing Arabic sets `dir="rtl"` and `lang="ar"` on
+`<html>`, so the layout mirrors and native pieces the React tree does not own — scrollbars,
+`select` popups, date and time pickers, `window.confirm` — follow suit.
+
+- **Weekdays** are indexed by `Date.prototype.getDay()`, so the Sunday-first schedule grid
+  reads **الأحد ← السبت** right-to-left under RTL from the same array that drives English.
+- **Plurals** go through `Intl.PluralRules`. Arabic selects across all six CLDR categories, so
+  counts inflect properly — `محاضرة واحدة` (1), `محاضرتان` (2), `٤ مقررات` (3–10),
+  `١١ مهمة` (11–99) — rather than bolting an "s" onto a noun.
+- **Numbers and dates** use `Intl` pinned to `ar-u-nu-arab`, giving Arabic-Indic digits
+  (`٢٧٪`, `٢٥ أغسطس`). The extension is deliberate: the default numbering system for bare
+  `'ar'` is a per-build ICU choice — Chromium resolves it to `latn` — so without pinning, the
+  same page renders Western digits in one browser and Arabic-Indic in another. For Western
+  digits throughout, change `AR_LOCALE` in `src/i18n/index.ts` to `ar-u-nu-latn`.
+- **Layout** uses CSS logical properties (`margin-inline-start`, `border-inline-start`,
+  `inset-inline-end`) rather than physical ones, so nothing needs a mirrored stylesheet.
+- **The Reader is pinned to `dir="ltr"`.** Paged mode lays text out in CSS columns and scrolls
+  them with `translateX`, with the ←/→ keys and tap zones wired to that axis; flipping it would
+  reverse the page-turn direction. The bundled texts are LTR anyway.
+
+`src/i18n/strings.ts` holds plain copy and `plurals.ts` the counted phrases. English is the
+source of truth in both: the Arabic table is typed as `Record<StringKey, string>`, so a missing
+or misspelled key fails `tsc` instead of rendering a key name to a student. Messages held in
+component state are stored **as keys, not resolved strings**, so an error already on screen
+re-renders in the new language when the toggle is used.
+
+Library and Vocabulary copy is still English only — translating the reading side was outside
+this work — but both mirror correctly under RTL.
 
 ---
 
@@ -77,6 +114,57 @@ npm run dev      # start the dev server
 npm run build    # typecheck (tsc) + production build
 npm run preview  # serve the production build
 ```
+
+---
+
+## Deploying to InfinityFree (or any static Apache host)
+
+Mero is a pure client-side build: no PHP, no database, no server-side anything. It needs static
+file hosting and nothing else.
+
+```bash
+npm ci
+npm run build          # writes dist/
+```
+
+Upload **the contents of `dist/`** — not the folder itself — into `htdocs/` on the host. That
+includes the leading-dot `.htaccess`; FTP clients hide dotfiles by default, so enable "show
+hidden files" in FileZilla (*Server → Force showing hidden files*) or the file manager, and
+confirm it arrived. Everything the app needs is in `dist/`; `node_modules/` and `src/` are not
+uploaded.
+
+### Why the `.htaccess` matters
+
+`/study`, `/study/courses` and `/read/<id>` exist only in the browser's router — there are no
+such directories on disk. Without the rewrite in `public/.htaccess`, loading or refreshing one
+of those URLs directly, or opening a shared link, returns the host's 404 page instead of the
+app. The rewrite serves `index.html` for any path that is not a real file, while leaving
+`assets/*` to be served normally. It also sets UTF-8 (the Arabic copy depends on it), long
+immutable caching for the fingerprinted assets, `no-cache` for `index.html` so visitors are
+never stranded on a stale build, and denies access to dotfiles — including itself.
+
+If the host returns **500 Internal Server Error** after upload, its `AllowOverride` does not
+permit `Options` in `.htaccess`: delete the two `Options` lines (`-MultiViews` near the top,
+`-Indexes` at the bottom). Everything else works without them.
+
+### Publishing into a subdirectory
+
+To serve from `example.com/mero/` rather than the domain root, build with a matching base and
+edit one line in the uploaded `.htaccess`:
+
+```bash
+VITE_BASE=/mero/ npm run build     # then set: RewriteBase /mero/
+```
+
+`src/main.tsx` feeds the same value to the router's `basename`, so client-side routes stay in
+step with where the assets live. A relative base (`./`) is deliberately not used — assets would
+resolve against the current URL, so `/study/courses` would look for `/study/assets/…` and 404.
+
+### Before you clear a browser
+
+All data lives in `localStorage` on the device. Clearing site data, using private browsing, or
+switching machines loses it. Export a backup from **Study → Data** first; the same page
+restores one.
 
 Open the dev URL Vite prints. On first run, Mero seeds a small multilingual library
 (English, Spanish, French, German) so every feature is immediately explorable. All data
@@ -101,9 +189,14 @@ src/
     seedBooks.ts           Starter library (original, multilingual texts)
     seedStudy.ts           Sample semester, dated relative to today
     dictionary.ts          Bilingual word lists + idiom tables for the mock translator
+  i18n/
+    strings.ts             English + Arabic copy, keyed and type-checked
+    plurals.ts             Counted phrases across the six CLDR plural categories
+    index.ts               useI18n(): t / tn / number, date, weekday, countdown
   services/
     translation.ts         Pluggable translation provider interface + offline mock
     export.ts              Anki / Quizlet / CSV exporters + file download
+    backup.ts              Study JSON backup: build, serialize, validate on import
   lib/
     selection.ts           DOM selection → paragraph-relative character offsets
     highlight.ts           Paragraph text → highlighted render segments
@@ -116,7 +209,9 @@ src/
     reader/    Reader, Paragraph, SelectionToolkit, TranslationSheet,
                SettingsPanel, HighlightPopover
     vocabulary/Vocabulary
-    study/     StudyLayout, Dashboard, Courses, Tasks, Exams, SignIn, ui
+    study/     StudyLayout, Dashboard, Courses, Tasks, Exams, Data, SignIn, ui
+public/
+  .htaccess                SPA rewrite, UTF-8, caching, dotfile deny (copied to dist/)
 ```
 
 The two stores persist under separate localStorage keys (`mero-store` and `mero-study`), so
@@ -142,6 +237,19 @@ the `user_id` foreign key:
 | `Task`    | `tasks`  | Assignments *and* study tasks; `kind` discriminates the two.    |
 | `Exam`    | `exams`  | Belongs to a course.                                            |
 | `Lecture` | —        | Recurring weekly slots backing the schedule grid.               |
+
+### Backups
+
+`services/backup.ts` writes a versioned JSON file (`app`, `version`, `exportedAt`, `data`)
+covering every profile in `mero-study`; reading settings live in the other store and are not
+included. Import **replaces** rather than merges: records reference each other by id, and
+reconciling two histories that share ids would leave lectures pointing at the wrong course.
+Files are validated field-by-field before anything is written, and a rejected file leaves the
+store untouched with a specific reason shown.
+
+Restore stays reachable with no profile selected — `/study/data` is exempt from the profile
+gate, and the gate itself links to it. That is the state a new device or a just-cleared browser
+starts in, which is exactly when a backup needs to go back in.
 
 ### Profiles are local, not accounts
 

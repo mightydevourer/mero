@@ -9,17 +9,8 @@ import {
   useTasks,
 } from '../../store/useStudyStore'
 import type { Priority, Weekday } from '../../types'
-import {
-  WEEKDAYS,
-  byDate,
-  countdownLabel,
-  daysUntil,
-  dueLabel,
-  formatDate,
-  formatTime,
-  isOverdue,
-  todayISO,
-} from '../../lib/date'
+import { byDate, daysUntil, isOverdue, todayISO } from '../../lib/date'
+import { useI18n, type StringKey } from '../../i18n'
 import { CourseChip, ProgressRing, SectionEmpty } from './ui'
 import { TaskRow, compareTasks } from './Tasks'
 
@@ -32,14 +23,15 @@ const PRIORITY_DOT: Record<Priority, string> = {
   low: '🟢',
 }
 
-function greeting(): string {
+function greetingKey(): StringKey {
   const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
+  if (hour < 12) return 'dash.morning'
+  if (hour < 18) return 'dash.afternoon'
+  return 'dash.evening'
 }
 
 export default function Dashboard() {
+  const { t, tn, fmt } = useI18n()
   const student = useCurrentStudent()
   const tasks = useTasks()
   const exams = useExams()
@@ -52,9 +44,9 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const total = tasks.length
-    const done = tasks.filter((t) => t.status === 'done').length
+    const done = tasks.filter((task) => task.status === 'done').length
     const open = total - done
-    const overdue = tasks.filter((t) => t.status !== 'done' && isOverdue(t.deadline)).length
+    const overdue = tasks.filter((task) => task.status !== 'done' && isOverdue(task.deadline)).length
     return {
       total,
       done,
@@ -68,7 +60,7 @@ export default function Dashboard() {
   const todayTasks = useMemo(
     () =>
       tasks
-        .filter((t) => t.status !== 'done' && (t.deadline === today || !t.deadline))
+        .filter((task) => task.status !== 'done' && (task.deadline === today || !task.deadline))
         .sort(compareTasks),
     [tasks, today],
   )
@@ -76,9 +68,9 @@ export default function Dashboard() {
   const upcomingAssignments = useMemo(
     () =>
       tasks
-        .filter((t) => {
-          if (t.kind !== 'assignment' || t.status === 'done' || !t.deadline) return false
-          const days = daysUntil(t.deadline)
+        .filter((task) => {
+          if (task.kind !== 'assignment' || task.status === 'done' || !task.deadline) return false
+          const days = daysUntil(task.deadline)
           return days !== null && days >= 0 && days <= HORIZON_DAYS
         })
         .sort(compareTasks),
@@ -86,7 +78,10 @@ export default function Dashboard() {
   )
 
   const overdueTasks = useMemo(
-    () => tasks.filter((t) => t.status !== 'done' && isOverdue(t.deadline)).sort(compareTasks),
+    () =>
+      tasks
+        .filter((task) => task.status !== 'done' && isOverdue(task.deadline))
+        .sort(compareTasks),
     [tasks],
   )
 
@@ -109,18 +104,21 @@ export default function Dashboard() {
     <div className="study-page">
       <div className="page-head">
         <h1>
-          {greeting()}
-          {student ? `, ${student.name.split(' ')[0]}` : ''}
+          {student
+            ? t('dash.greeting', {
+                greeting: t(greetingKey()),
+                name: student.name.split(' ')[0],
+              })
+            : t(greetingKey())}
         </h1>
         <p>
-          {WEEKDAYS[weekday]}, {formatDate(today)}
+          {t('dash.dateLine', { weekday: fmt.weekday(weekday), date: fmt.date(today) })}
         </p>
       </div>
 
       {isNewProfile ? (
-        <SectionEmpty title="Your semester is empty">
-          Start by <Link to="/study/courses">adding a course</Link> — assignments, exams and
-          lectures all attach to one.
+        <SectionEmpty title={t('dash.emptyTitle')}>
+          {t('dash.emptyBody')} <Link to="/study/courses">{t('dash.emptyLink')}</Link>
         </SectionEmpty>
       ) : (
         <>
@@ -128,28 +126,26 @@ export default function Dashboard() {
             <div className="dash-progress">
               <ProgressRing percent={stats.percent} />
               <div>
-                <strong>Progress</strong>
-                <p>
-                  {stats.done} of {stats.total} tasks complete
-                </p>
+                <strong>{t('dash.progress')}</strong>
+                <p>{t('dash.tasksComplete', { done: stats.done, total: stats.total })}</p>
               </div>
             </div>
             <div className="stat-tiles">
               <div className="stat-tile">
-                <span className="stat-value">{stats.open}</span>
-                <span className="stat-label">Open</span>
+                <span className="stat-value">{fmt.number(stats.open)}</span>
+                <span className="stat-label">{t('dash.statOpen')}</span>
               </div>
               <div className="stat-tile">
-                <span className="stat-value">{todayTasks.length}</span>
-                <span className="stat-label">For today</span>
+                <span className="stat-value">{fmt.number(todayTasks.length)}</span>
+                <span className="stat-label">{t('dash.statToday')}</span>
               </div>
               <div className={'stat-tile' + (stats.overdue > 0 ? ' alert' : '')}>
-                <span className="stat-value">{stats.overdue}</span>
-                <span className="stat-label">Overdue</span>
+                <span className="stat-value">{fmt.number(stats.overdue)}</span>
+                <span className="stat-label">{t('dash.statOverdue')}</span>
               </div>
               <div className="stat-tile">
-                <span className="stat-value">{upcomingExams.length}</span>
-                <span className="stat-label">Exams ahead</span>
+                <span className="stat-value">{fmt.number(upcomingExams.length)}</span>
+                <span className="stat-label">{t('dash.statExams')}</span>
               </div>
             </div>
           </div>
@@ -157,16 +153,18 @@ export default function Dashboard() {
           {overdueTasks.length > 0 && (
             <section className="dash-section">
               <div className="dash-head">
-                <h2>Overdue</h2>
-                <Link to="/study/tasks">All tasks →</Link>
+                <h2>{t('dash.overdue')}</h2>
+                <Link to="/study/tasks">{t('dash.allTasks')}</Link>
               </div>
               <div className="deadline-list">
-                {overdueTasks.map((t) => (
-                  <Link to="/study/tasks" className="deadline-row overdue" key={t.id}>
-                    <span className="deadline-dot">{PRIORITY_DOT[t.priority]}</span>
-                    <span className="deadline-title">{t.title}</span>
-                    <CourseChip course={t.courseId ? courseMap.get(t.courseId) : undefined} />
-                    <span className="deadline-when">{dueLabel(t.deadline)}</span>
+                {overdueTasks.map((task) => (
+                  <Link to="/study/tasks" className="deadline-row overdue" key={task.id}>
+                    <span className="deadline-dot">{PRIORITY_DOT[task.priority]}</span>
+                    <span className="deadline-title">{task.title}</span>
+                    <CourseChip
+                      course={task.courseId ? courseMap.get(task.courseId) : undefined}
+                    />
+                    <span className="deadline-when">{fmt.due(task.deadline)}</span>
                   </Link>
                 ))}
               </div>
@@ -176,17 +174,17 @@ export default function Dashboard() {
           <div className="dash-columns">
             <section className="dash-section">
               <div className="dash-head">
-                <h2>Today’s tasks</h2>
-                <Link to="/study/tasks">All tasks →</Link>
+                <h2>{t('dash.todayTasks')}</h2>
+                <Link to="/study/tasks">{t('dash.allTasks')}</Link>
               </div>
               {todayTasks.length === 0 ? (
-                <SectionEmpty title="Nothing left for today">
-                  Everything dated today is done.
+                <SectionEmpty title={t('dash.todayTasksEmpty')}>
+                  {t('dash.todayTasksEmptyBody')}
                 </SectionEmpty>
               ) : (
                 <div className="task-list">
-                  {todayTasks.map((t) => (
-                    <TaskRow key={t.id} task={t} />
+                  {todayTasks.map((task) => (
+                    <TaskRow key={task.id} task={task} />
                   ))}
                 </div>
               )}
@@ -195,11 +193,11 @@ export default function Dashboard() {
             <div className="dash-side">
               <section className="dash-section">
                 <div className="dash-head">
-                  <h2>Today’s classes</h2>
-                  <Link to="/study/courses">Schedule →</Link>
+                  <h2>{t('dash.todayClasses')}</h2>
+                  <Link to="/study/courses">{t('dash.schedule')}</Link>
                 </div>
                 {todayClasses.length === 0 ? (
-                  <SectionEmpty title="No lectures today" />
+                  <SectionEmpty title={t('dash.todayClassesEmpty')} />
                 ) : (
                   <div className="class-list">
                     {todayClasses.map((l) => {
@@ -208,10 +206,12 @@ export default function Dashboard() {
                         <div
                           className="class-row"
                           key={l.id}
-                          style={{ borderLeftColor: course?.color ?? 'var(--border)' }}
+                          style={{ borderInlineStartColor: course?.color ?? 'var(--border)' }}
                         >
-                          <span className="class-time">{formatTime(l.startTime)}</span>
-                          <span className="class-name">{course?.name ?? 'Course'}</span>
+                          <span className="class-time">
+                            <bdi>{fmt.time(l.startTime)}</bdi>
+                          </span>
+                          <span className="class-name">{course?.name ?? ''}</span>
                           {l.location && <span className="class-room">{l.location}</span>}
                         </div>
                       )
@@ -222,20 +222,20 @@ export default function Dashboard() {
 
               <section className="dash-section">
                 <div className="dash-head">
-                  <h2>Upcoming assignments</h2>
-                  <Link to="/study/tasks">All →</Link>
+                  <h2>{t('dash.upcomingAssignments')}</h2>
+                  <Link to="/study/tasks">{t('dash.all')}</Link>
                 </div>
                 {upcomingAssignments.length === 0 ? (
-                  <SectionEmpty title="Nothing due soon">
-                    No assignments in the next {HORIZON_DAYS} days.
+                  <SectionEmpty title={t('dash.upcomingAssignmentsEmpty')}>
+                    {tn('dash.noAssignmentsHorizon', HORIZON_DAYS)}
                   </SectionEmpty>
                 ) : (
                   <div className="deadline-list">
-                    {upcomingAssignments.map((t) => (
-                      <Link to="/study/tasks" className="deadline-row" key={t.id}>
-                        <span className="deadline-dot">{PRIORITY_DOT[t.priority]}</span>
-                        <span className="deadline-title">{t.title}</span>
-                        <span className="deadline-when">{dueLabel(t.deadline)}</span>
+                    {upcomingAssignments.map((task) => (
+                      <Link to="/study/tasks" className="deadline-row" key={task.id}>
+                        <span className="deadline-dot">{PRIORITY_DOT[task.priority]}</span>
+                        <span className="deadline-title">{task.title}</span>
+                        <span className="deadline-when">{fmt.due(task.deadline)}</span>
                       </Link>
                     ))}
                   </div>
@@ -244,18 +244,18 @@ export default function Dashboard() {
 
               <section className="dash-section">
                 <div className="dash-head">
-                  <h2>Upcoming exams</h2>
-                  <Link to="/study/exams">All →</Link>
+                  <h2>{t('dash.upcomingExams')}</h2>
+                  <Link to="/study/exams">{t('dash.all')}</Link>
                 </div>
                 {upcomingExams.length === 0 ? (
-                  <SectionEmpty title="No exams scheduled" />
+                  <SectionEmpty title={t('dash.upcomingExamsEmpty')} />
                 ) : (
                   <div className="deadline-list">
                     {upcomingExams.slice(0, 4).map((e) => (
                       <Link to="/study/exams" className="deadline-row" key={e.id}>
                         <span className="deadline-dot">📝</span>
                         <span className="deadline-title">{e.title}</span>
-                        <span className="deadline-when">{countdownLabel(e.date)}</span>
+                        <span className="deadline-when">{fmt.countdown(e.date)}</span>
                       </Link>
                     ))}
                   </div>

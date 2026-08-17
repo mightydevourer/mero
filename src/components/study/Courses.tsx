@@ -8,16 +8,20 @@ import {
 } from '../../store/useStudyStore'
 import type { Course, Lecture, Weekday } from '../../types'
 import { COURSE_COLORS, nextCourseColor } from '../../lib/courseColors'
-import { WEEKDAYS, WEEKDAYS_SHORT, formatTime } from '../../lib/date'
-import { pluralize } from '../../lib/format'
 import { useToast } from '../../lib/toast'
+import { useI18n } from '../../i18n'
 import { PlusIcon, TrashIcon } from '../Icons'
 import { Field, Modal, SectionEmpty } from './ui'
 
-/** Sunday-first ordering over `Date.prototype.getDay()` values. */
+/**
+ * Sunday-first ordering over `Date.prototype.getDay()` values. Under RTL the
+ * grid mirrors on its own, so Arabic reads الأحد → السبت right-to-left from
+ * this same array.
+ */
 const WEEK_ORDER: Weekday[] = [0, 1, 2, 3, 4, 5, 6]
 
 function CourseForm({ course, onClose }: { course?: Course; onClose: () => void }) {
+  const { t } = useI18n()
   const courses = useCourses()
   const addCourse = useStudyStore((s) => s.addCourse)
   const updateCourse = useStudyStore((s) => s.updateCourse)
@@ -34,7 +38,7 @@ function CourseForm({ course, onClose }: { course?: Course; onClose: () => void 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     const trimmed = name.trim()
-    if (!trimmed) return setError('A course needs a name.')
+    if (!trimmed) return setError(t('courseForm.errName'))
 
     const payload = {
       name: trimmed,
@@ -44,18 +48,21 @@ function CourseForm({ course, onClose }: { course?: Course; onClose: () => void 
     }
     if (course) {
       updateCourse(course.id, payload)
-      showToast('Course updated')
+      showToast(t('courseForm.updated'))
     } else {
       addCourse(payload)
-      showToast('Course added')
+      showToast(t('courseForm.added'))
     }
     onClose()
   }
 
   return (
-    <Modal title={course ? 'Edit course' : 'Add course'} onClose={onClose}>
+    <Modal
+      title={t(course ? 'courseForm.editTitle' : 'courseForm.addTitle')}
+      onClose={onClose}
+    >
       <form className="form" onSubmit={submit}>
-        <Field label="Course name">
+        <Field label={t('courseForm.name')}>
           <input
             className="input"
             value={name}
@@ -63,29 +70,29 @@ function CourseForm({ course, onClose }: { course?: Course; onClose: () => void 
               setName(e.target.value)
               setError(null)
             }}
-            placeholder="Web Programming"
+            placeholder={t('courseForm.namePlaceholder')}
             autoFocus
           />
         </Field>
         <div className="form-row">
-          <Field label="Instructor">
+          <Field label={t('courseForm.instructor')}>
             <input
               className="input"
               value={instructor}
               onChange={(e) => setInstructor(e.target.value)}
-              placeholder="Dr. Amara Osei"
+              placeholder={t('courseForm.instructorPlaceholder')}
             />
           </Field>
-          <Field label="Course code" hint="Optional — shown on compact cards.">
+          <Field label={t('courseForm.code')} hint={t('courseForm.codeHint')}>
             <input
               className="input"
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              placeholder="CS-204"
+              placeholder={t('courseForm.codePlaceholder')}
             />
           </Field>
         </div>
-        <Field label="Colour">
+        <Field label={t('courseForm.color')}>
           <div className="color-picker">
             {COURSE_COLORS.map((c) => (
               <button
@@ -93,7 +100,7 @@ function CourseForm({ course, onClose }: { course?: Course; onClose: () => void 
                 type="button"
                 className={'color-swatch' + (color === c ? ' active' : '')}
                 style={{ background: c }}
-                aria-label={`Use colour ${c}`}
+                aria-label={t('courseForm.colorAria', { color: c })}
                 aria-pressed={color === c}
                 onClick={() => setColor(c)}
               />
@@ -103,10 +110,10 @@ function CourseForm({ course, onClose }: { course?: Course; onClose: () => void 
         {error && <p className="form-error">{error}</p>}
         <div className="form-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Cancel
+            {t('form.cancel')}
           </button>
           <button type="submit" className="btn btn-primary">
-            {course ? 'Save changes' : 'Add course'}
+            {t(course ? 'form.save' : 'courses.add')}
           </button>
         </div>
       </form>
@@ -115,6 +122,7 @@ function CourseForm({ course, onClose }: { course?: Course; onClose: () => void 
 }
 
 function LectureForm({ lecture, onClose }: { lecture?: Lecture; onClose: () => void }) {
+  const { t, fmt } = useI18n()
   const courses = useCourses()
   const addLecture = useStudyStore((s) => s.addLecture)
   const updateLecture = useStudyStore((s) => s.updateLecture)
@@ -129,25 +137,28 @@ function LectureForm({ lecture, onClose }: { lecture?: Lecture; onClose: () => v
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
-    if (!courseId) return setError('Pick a course for this lecture.')
-    if (!startTime || !endTime) return setError('Set a start and end time.')
-    if (endTime <= startTime) return setError('The end time must come after the start time.')
+    if (!courseId) return setError(t('lectureForm.errCourse'))
+    if (!startTime || !endTime) return setError(t('lectureForm.errTimes'))
+    if (endTime <= startTime) return setError(t('lectureForm.errOrder'))
 
     const payload = { courseId, day, startTime, endTime, location: location.trim() || undefined }
     if (lecture) {
       updateLecture(lecture.id, payload)
-      showToast('Lecture updated')
+      showToast(t('lectureForm.updated'))
     } else {
       addLecture(payload)
-      showToast('Lecture added')
+      showToast(t('lectureForm.added'))
     }
     onClose()
   }
 
   return (
-    <Modal title={lecture ? 'Edit lecture' : 'Add lecture'} onClose={onClose}>
+    <Modal
+      title={t(lecture ? 'lectureForm.editTitle' : 'lectureForm.addTitle')}
+      onClose={onClose}
+    >
       <form className="form" onSubmit={submit}>
-        <Field label="Course">
+        <Field label={t('lectureForm.course')}>
           <select
             className="select"
             value={courseId}
@@ -163,7 +174,7 @@ function LectureForm({ lecture, onClose }: { lecture?: Lecture; onClose: () => v
             ))}
           </select>
         </Field>
-        <Field label="Day">
+        <Field label={t('lectureForm.day')}>
           <select
             className="select"
             value={day}
@@ -171,13 +182,13 @@ function LectureForm({ lecture, onClose }: { lecture?: Lecture; onClose: () => v
           >
             {WEEK_ORDER.map((d) => (
               <option key={d} value={d}>
-                {WEEKDAYS[d]}
+                {fmt.weekday(d)}
               </option>
             ))}
           </select>
         </Field>
         <div className="form-row">
-          <Field label="Starts">
+          <Field label={t('lectureForm.starts')}>
             <input
               className="input"
               type="time"
@@ -188,7 +199,7 @@ function LectureForm({ lecture, onClose }: { lecture?: Lecture; onClose: () => v
               }}
             />
           </Field>
-          <Field label="Ends">
+          <Field label={t('lectureForm.ends')}>
             <input
               className="input"
               type="time"
@@ -200,21 +211,21 @@ function LectureForm({ lecture, onClose }: { lecture?: Lecture; onClose: () => v
             />
           </Field>
         </div>
-        <Field label="Room" hint="Optional.">
+        <Field label={t('lectureForm.room')} hint={t('form.optional')}>
           <input
             className="input"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="Hall B2"
+            placeholder={t('lectureForm.roomPlaceholder')}
           />
         </Field>
         {error && <p className="form-error">{error}</p>}
         <div className="form-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
-            Cancel
+            {t('form.cancel')}
           </button>
           <button type="submit" className="btn btn-primary">
-            {lecture ? 'Save changes' : 'Add lecture'}
+            {t(lecture ? 'form.save' : 'schedule.add')}
           </button>
         </div>
       </form>
@@ -223,6 +234,7 @@ function LectureForm({ lecture, onClose }: { lecture?: Lecture; onClose: () => v
 }
 
 export default function Courses() {
+  const { t, tn, fmt } = useI18n()
   const courses = useCourses()
   const lectures = useLectures()
   const tasks = useTasks()
@@ -248,9 +260,9 @@ export default function Courses() {
   const courseMeta = useMemo(() => {
     const meta = new Map<string, { open: number; exams: number; lectures: number }>()
     for (const c of courses) meta.set(c.id, { open: 0, exams: 0, lectures: 0 })
-    for (const t of tasks) {
-      if (!t.courseId || t.status === 'done') continue
-      const m = meta.get(t.courseId)
+    for (const task of tasks) {
+      if (!task.courseId || task.status === 'done') continue
+      const m = meta.get(task.courseId)
       if (m) m.open++
     }
     for (const e of exams) {
@@ -268,32 +280,31 @@ export default function Courses() {
     const meta = courseMeta.get(course.id)
     const attached = (meta?.open ?? 0) + (meta?.exams ?? 0) + (meta?.lectures ?? 0)
     const warning = attached
-      ? `\n\nIts ${pluralize(meta?.lectures ?? 0, 'lecture')}, ${pluralize(
-          meta?.open ?? 0,
-          'open task',
-        )} and ${pluralize(meta?.exams ?? 0, 'exam')} will be deleted too.`
+      ? t('courses.confirmCascade', {
+          lectures: tn('count.lecture', meta?.lectures ?? 0),
+          tasks: tn('count.openTask', meta?.open ?? 0),
+          exams: tn('count.exam', meta?.exams ?? 0),
+        })
       : ''
-    if (!window.confirm(`Delete “${course.name}”?${warning}`)) return
+    if (!window.confirm(t('courses.confirmDelete', { name: course.name }) + warning)) return
     removeCourse(course.id)
-    showToast('Course deleted')
+    showToast(t('courseForm.deleted'))
   }
 
   return (
     <div className="study-page">
       <div className="page-head study-head">
         <div>
-          <h1>Courses</h1>
-          <p>The subjects you are enrolled in, and when they meet each week.</p>
+          <h1>{t('courses.title')}</h1>
+          <p>{t('courses.subtitle')}</p>
         </div>
         <button className="btn btn-primary" onClick={() => setCourseForm({ open: true })}>
-          <PlusIcon /> Add course
+          <PlusIcon /> {t('courses.add')}
         </button>
       </div>
 
       {courses.length === 0 ? (
-        <SectionEmpty title="No courses yet">
-          Add your first course — assignments, exams and lectures all hang off it.
-        </SectionEmpty>
+        <SectionEmpty title={t('courses.empty')}>{t('courses.emptyBody')}</SectionEmpty>
       ) : (
         <div className="course-grid">
           {courses.map((c) => {
@@ -308,9 +319,9 @@ export default function Courses() {
                   </div>
                   {c.instructor && <p className="course-instructor">{c.instructor}</p>}
                   <p className="course-stats">
-                    {pluralize(meta?.lectures ?? 0, 'lecture')} ·{' '}
-                    {pluralize(meta?.open ?? 0, 'open task')} ·{' '}
-                    {pluralize(meta?.exams ?? 0, 'exam')}
+                    {tn('count.lecture', meta?.lectures ?? 0)} ·{' '}
+                    {tn('count.openTask', meta?.open ?? 0)} ·{' '}
+                    {tn('count.exam', meta?.exams ?? 0)}
                   </p>
                 </div>
                 <div className="course-actions">
@@ -318,11 +329,11 @@ export default function Courses() {
                     className="btn btn-ghost btn-sm"
                     onClick={() => setCourseForm({ open: true, course: c })}
                   >
-                    Edit
+                    {t('courses.edit')}
                   </button>
                   <button
                     className="icon-btn"
-                    aria-label={`Delete ${c.name}`}
+                    aria-label={t('courses.deleteAria', { name: c.name })}
                     onClick={() => confirmRemoveCourse(c)}
                   >
                     <TrashIcon />
@@ -336,24 +347,22 @@ export default function Courses() {
 
       <div className="page-head study-head schedule-head">
         <div>
-          <h2>Weekly schedule</h2>
-          <p>Your recurring lecture slots.</p>
+          <h2>{t('schedule.title')}</h2>
+          <p>{t('schedule.subtitle')}</p>
         </div>
         <button
           className="btn"
           disabled={courses.length === 0}
-          title={courses.length === 0 ? 'Add a course first' : undefined}
+          title={courses.length === 0 ? t('courses.addFirst') : undefined}
           onClick={() => setLectureForm({ open: true })}
         >
-          <PlusIcon /> Add lecture
+          <PlusIcon /> {t('schedule.add')}
         </button>
       </div>
 
       {lectures.length === 0 ? (
-        <SectionEmpty title="Nothing scheduled">
-          {courses.length === 0
-            ? 'Add a course first, then give it lecture times.'
-            : 'Add the days and times your lectures run.'}
+        <SectionEmpty title={t('schedule.empty')}>
+          {courses.length === 0 ? t('schedule.emptyNoCourses') : t('schedule.emptyBody')}
         </SectionEmpty>
       ) : (
         <div className="week-grid">
@@ -362,7 +371,7 @@ export default function Courses() {
             return (
               <div className="week-col" key={day}>
                 <div className="week-day">
-                  <span className="week-day-short">{WEEKDAYS_SHORT[day]}</span>
+                  <span className="week-day-short">{fmt.weekdayShort(day)}</span>
                 </div>
                 {slots.length === 0 ? (
                   <p className="week-free">—</p>
@@ -373,25 +382,27 @@ export default function Courses() {
                       <div
                         className="slot"
                         key={l.id}
-                        style={{ borderLeftColor: course?.color ?? 'var(--border)' }}
+                        style={{ borderInlineStartColor: course?.color ?? 'var(--border)' }}
                       >
                         <button
                           className="slot-main"
                           onClick={() => setLectureForm({ open: true, lecture: l })}
-                          title="Edit this lecture"
+                          title={t('schedule.editAria')}
                         >
-                          <strong>{course?.code ?? course?.name ?? 'Course'}</strong>
-                          <span>
-                            {formatTime(l.startTime)} – {formatTime(l.endTime)}
+                          <strong>{course?.code ?? course?.name ?? t('lectureForm.course')}</strong>
+                          {/* <bdi> isolates each time so the pair keeps its
+                              start–end order when the page is RTL. */}
+                          <span className="slot-time">
+                            <bdi>{fmt.time(l.startTime)}</bdi> – <bdi>{fmt.time(l.endTime)}</bdi>
                           </span>
                           {l.location && <span className="slot-room">{l.location}</span>}
                         </button>
                         <button
                           className="slot-remove"
-                          aria-label="Remove lecture"
+                          aria-label={t('schedule.removeAria')}
                           onClick={() => {
                             removeLecture(l.id)
-                            showToast('Lecture removed')
+                            showToast(t('lectureForm.removed'))
                           }}
                         >
                           ×

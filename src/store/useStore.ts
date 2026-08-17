@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS: Settings = {
   pageMode: 'scroll',
   justify: false,
   targetLanguage: 'en',
+  uiLanguage: 'en',
 }
 
 interface StoreState {
