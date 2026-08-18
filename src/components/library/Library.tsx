@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../../store/useStore'
 import type { Book, ReadingStatus } from '../../types'
 import { relativeTime } from '../../lib/format'
+import { useToast } from '../../lib/toast'
+import { useI18n } from '../../i18n'
 import BookCard, { coverGradient } from './BookCard'
 
 type StatusFilter = 'all' | ReadingStatus
@@ -17,8 +19,21 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
 const STANDALONE = '__standalone'
 
 export default function Library() {
+  const { t } = useI18n()
   const navigate = useNavigate()
   const books = useStore((s) => s.books)
+  const resetLibrary = useStore((s) => s.resetLibrary)
+  const showToast = useToast((s) => s.show)
+
+  /**
+   * Books can be deleted but not added, so without this the library is a
+   * one-way door: delete the last one and there is no way back to a text.
+   */
+  const restore = () => {
+    if (!window.confirm(t('library.confirmRestore'))) return
+    resetLibrary()
+    showToast(t('library.restored'))
+  }
 
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState<StatusFilter>('all')
@@ -131,7 +146,18 @@ export default function Library() {
         </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {/* An emptied library is a distinct state from "the filters match
+          nothing", and it needs a way out: books can be deleted but not
+          added, so this is the only route back to a text. */}
+      {books.length === 0 ? (
+        <div className="empty">
+          <h3>{t('library.emptyTitle')}</h3>
+          <p>{t('library.emptyBody')}</p>
+          <button className="btn btn-primary" style={{ marginTop: 18 }} onClick={restore}>
+            {t('library.restore')}
+          </button>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="empty">
           <h3>No books match</h3>
           <p>Try clearing the search or filters.</p>

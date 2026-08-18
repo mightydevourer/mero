@@ -508,7 +508,7 @@ button {
 .cover-lang {
   position: absolute;
   top: 12px;
-  right: 12px;
+  inset-inline-end: 12px;
   z-index: 3;
   font-size: 10.5px;
   font-weight: 700;
@@ -2616,4 +2616,52 @@ input[type='range'] {
 }
 .signin-restore:hover {
   text-decoration: underline;
+}
+
+/* --- Delete a book from the library --------------------------------------- */
+
+/* Sits on the cover, revealed on hover or keyboard focus so it never competes
+   with the cover art. `inset-inline-end` keeps it on the trailing corner in
+   both directions. */
+.cover-delete {
+  position: absolute;
+  top: 8px;
+  /* Opposite corner from .cover-lang, which owns the inline-end side; both are
+     flow-relative, so they swap together and never collide. */
+  inset-inline-start: 8px;
+  /* Above .cover-title (z-index: 3), which otherwise intercepts the click. */
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  opacity: 0;
+  transition: opacity var(--speed), background var(--speed);
+}
+.book-card:hover .cover-delete,
+.book-card:focus-within .cover-delete,
+.cover-delete:focus-visible {
+  opacity: 1;
+}
+.cover-delete:hover {
+  background: var(--pri-high);
+}
+.cover-delete:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+}
+
+/* Touch devices have no hover, so the control is always visible there. */
+@media (hover: none) {
+  .cover-delete {
+    opacity: 1;
+    background: rgba(0, 0, 0, 0.35);
+  }
 }
