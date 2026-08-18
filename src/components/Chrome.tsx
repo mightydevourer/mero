@@ -1,12 +1,9 @@
-import { useMemo } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useStore } from '../store/useStore'
-import { useTasks } from '../store/useStudyStore'
-import { isOverdue, todayISO } from '../lib/date'
 import { LANGUAGES, useI18n } from '../i18n'
-import type { UiLanguage } from '../types'
+import type { ThemeName, UiLanguage } from '../types'
 
-const linkClass = ({ isActive }: { isActive: boolean }) => 'nav-link' + (isActive ? ' active' : '')
+const THEMES: ThemeName[] = ['light', 'sepia', 'dark']
 
 function LanguageSwitcher() {
   const { t, lang } = useI18n()
@@ -30,44 +27,47 @@ function LanguageSwitcher() {
   )
 }
 
+/**
+ * The reader's settings panel used to be the only way to change theme. It went
+ * with the reading pages, so the control lives up here now — otherwise the
+ * three themes the stylesheet already supports would be unreachable.
+ */
+function ThemeSwitcher() {
+  const { t } = useI18n()
+  const theme = useStore((s) => s.settings.theme)
+  const updateSettings = useStore((s) => s.updateSettings)
+
+  return (
+    <div className="lang-switch" role="group" aria-label={t('nav.theme')}>
+      {THEMES.map((name) => (
+        <button
+          key={name}
+          type="button"
+          className={'lang-option' + (theme === name ? ' active' : '')}
+          aria-pressed={theme === name}
+          onClick={() => updateSettings({ theme: name })}
+        >
+          {t(`theme.${name}`)}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function Chrome() {
-  const { t, fmt } = useI18n()
-  const vocabCount = useStore((s) => s.vocab.length)
-  const tasks = useTasks()
-
-  /** Work that needs attention today — due now or already late. */
-  const dueCount = useMemo(() => {
-    const today = todayISO()
-    return tasks.filter(
-      (t) => t.status !== 'done' && (t.deadline === today || isOverdue(t.deadline)),
-    ).length
-  }, [tasks])
-
   return (
     <>
       <header className="app-nav">
         <div className="nav-inner">
-          <NavLink to="/" className="brand">
-            {/* Built from BASE_URL rather than a literal '/mero.svg': Vite
-                rewrites paths in index.html but not string literals in
-                components, so a subdirectory build would 404 on the logo. */}
+          <NavLink to="/study" className="brand">
             <img src={`${import.meta.env.BASE_URL}mero.svg`} alt="" />
             Mero
           </NavLink>
-          <nav className="nav-links">
-            <NavLink to="/" end className={linkClass}>
-              {t('nav.library')}
-            </NavLink>
-            <NavLink to="/vocabulary" className={linkClass}>
-              {t('nav.vocabulary')}
-              {vocabCount > 0 && <span className="nav-count">{fmt.number(vocabCount)}</span>}
-            </NavLink>
-            <NavLink to="/study" className={linkClass}>
-              {t('nav.study')}
-              {dueCount > 0 && <span className="nav-count alert">{fmt.number(dueCount)}</span>}
-            </NavLink>
-          </nav>
-          <LanguageSwitcher />
+          {/* The study tabs live in StudyLayout; the bar carries preferences. */}
+          <div className="nav-prefs">
+            <ThemeSwitcher />
+            <LanguageSwitcher />
+          </div>
         </div>
       </header>
       <main className="app-main">

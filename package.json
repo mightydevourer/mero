@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Mero — an intensive-reading environment for power readers, academics, and language learners.",
+  "description": "Mero — a study organizer for university students.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

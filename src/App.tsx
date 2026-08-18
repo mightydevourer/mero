@@ -4,9 +4,6 @@ import { useStore } from './store/useStore'
 import { directionOf } from './i18n'
 import Chrome from './components/Chrome'
 import Toast from './components/Toast'
-import Library from './components/library/Library'
-import Vocabulary from './components/vocabulary/Vocabulary'
-import Reader from './components/reader/Reader'
 import StudyLayout from './components/study/StudyLayout'
 import Dashboard from './components/study/Dashboard'
 import Courses from './components/study/Courses'
@@ -35,8 +32,10 @@ export default function App() {
     <>
       <Routes>
         <Route element={<Chrome />}>
-          <Route path="/" element={<Library />} />
-          <Route path="/vocabulary" element={<Vocabulary />} />
+          {/* The study section is the whole app now. Its routes keep the
+              /study prefix so links already shared or bookmarked — and the
+              deployed host's rewrite rules — keep working; / just forwards. */}
+          <Route path="/" element={<Navigate to="/study" replace />} />
           <Route path="/study" element={<StudyLayout />}>
             <Route index element={<Dashboard />} />
             <Route path="courses" element={<Courses />} />
@@ -45,8 +44,7 @@ export default function App() {
             <Route path="data" element={<Data />} />
           </Route>
         </Route>
-        <Route path="/read/:bookId" element={<Reader />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/study" replace />} />
       </Routes>
       <Toast />
     </>

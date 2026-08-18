@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useStudyStore } from '../../store/useStudyStore'
-import { downloadTextFile } from '../../services/export'
+import { downloadTextFile } from '../../lib/download'
 import {
   backupCounts,
   backupFilename,

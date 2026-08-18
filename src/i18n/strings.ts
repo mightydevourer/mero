@@ -12,28 +12,19 @@
 
 export const en = {
   // Global chrome
-  'nav.library': 'Library',
-  'nav.vocabulary': 'Vocabulary',
-  'nav.study': 'Study',
   'nav.language': 'Language',
+  'nav.theme': 'Theme',
+  'theme.light': 'Light',
+  'theme.sepia': 'Sepia',
+  'theme.dark': 'Dark',
   'lang.en': 'English',
   'lang.ar': 'العربية',
 
-  // Library
-  'library.deleteBook': 'Delete “{title}”',
-  'library.confirmDelete': 'Delete “{title}” from your library?',
-  'library.confirmDeleteNote': '\n\nIts highlights and notes go with it. Vocabulary you mined from it stays.',
-  'library.deleted': 'Book deleted',
-  'library.emptyTitle': 'Your library is empty',
-  'library.emptyBody': 'Every book has been removed. You can put the starter library back.',
-  'library.restore': 'Restore the sample library',
-  'library.restored': 'Sample library restored',
-  'library.confirmRestore': 'Restore the sample library? Any books you kept will be replaced, and highlights cleared.',
 
   // Profile gate
   'signin.title': 'Study Organizer',
   'signin.intro':
-    'Keep your courses, timetable, assignments, exams and daily study tasks in one place — alongside the texts you read in Mero.',
+    'Keep your courses, timetable, assignments, exams and daily study tasks in one place.',
   'signin.create': 'Create your profile',
   'signin.name': 'Full name',
   'signin.namePlaceholder': 'Alex Moreau',
@@ -313,28 +304,19 @@ export type StringKey = keyof typeof en
 
 export const ar: Record<StringKey, string> = {
   // Global chrome
-  'nav.library': 'المكتبة',
-  'nav.vocabulary': 'المفردات',
-  'nav.study': 'الدراسة',
   'nav.language': 'اللغة',
+  'nav.theme': 'السمة',
+  'theme.light': 'فاتح',
+  'theme.sepia': 'ورقي',
+  'theme.dark': 'داكن',
   'lang.en': 'English',
   'lang.ar': 'العربية',
 
-  // Library
-  'library.deleteBook': 'حذف «{title}»',
-  'library.confirmDelete': 'حذف «{title}» من مكتبتك؟',
-  'library.confirmDeleteNote': '\n\nستُحذف معه التظليلات والملاحظات. أما المفردات التي استخرجتها منه فتبقى.',
-  'library.deleted': 'حُذف الكتاب',
-  'library.emptyTitle': 'مكتبتك فارغة',
-  'library.emptyBody': 'حُذفت كل الكتب. يمكنك إعادة المكتبة الأولية.',
-  'library.restore': 'إعادة المكتبة الأولية',
-  'library.restored': 'أُعيدت المكتبة الأولية',
-  'library.confirmRestore': 'إعادة المكتبة الأولية؟ ستُستبدل أي كتب احتفظت بها، وتُمسح التظليلات.',
 
   // Profile gate
   'signin.title': 'منظّم الدراسة',
   'signin.intro':
-    'احتفظ بمقرراتك وجدولك الأسبوعي وواجباتك واختباراتك ومهامك اليومية في مكان واحد — إلى جانب النصوص التي تقرؤها في ميرو.',
+    'احتفظ بمقرراتك وجدولك الأسبوعي وواجباتك واختباراتك ومهامك اليومية في مكان واحد.',
   'signin.create': 'أنشئ ملفك الشخصي',
   'signin.name': 'الاسم الكامل',
   'signin.namePlaceholder': 'سارة الأحمد',

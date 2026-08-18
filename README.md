@@ -1,57 +1,16 @@
 # Mero
 
-**An intensive-reading environment for power readers, academics, and language learners.**
+**A study organizer for university students.**
 
-Mero turns reading into an interactive process of knowledge extraction. Highlight a
-passage to translate it, mine the word and its original context into a personal
-vocabulary bank, and export the whole thing to your spaced-repetition tool of choice —
-all without breaking your reading flow.
+Mero keeps courses, the weekly timetable, assignments, exams and daily study tasks in one
+place, with a dashboard that counts down to whatever is next.
 
-For students, a built-in **Study Organizer** keeps courses, timetable, assignments, exams
-and daily study tasks beside the texts they are set against.
-
-This repository contains the Mero MVP: a fast, offline-capable, client-side web app
-built with **React + TypeScript + Vite**.
+A fast, offline-capable, client-side web app built with **React + TypeScript + Vite**. It
+stores everything in the browser and talks to no server.
 
 ---
 
-## The five pillars
-
-### 1. Library Dashboard (`/`)
-A visual archive of your texts. Books are grouped into **series shelves**, filterable by
-**reading status** and **tag**, and searchable by title/author/tag. A **Continue Reading**
-rail puts your most recent texts one click away.
-
-### 2. The Immersive Reader (`/read/:bookId`)
-A distraction-free reading surface with total typographic control:
-
-- **Themes:** Light, Sepia, Dark
-- **Typography:** typeface, font size, line spacing, reading width, justification
-- **Page turn:** continuous **Scroll** or column-based **Paged** mode (← / → or tap zones)
-- **Focus mode** + auto-hiding chrome, chapter navigation, and persisted reading progress
-
-### 3. The Active Toolkit
-Select any passage to summon a floating toolkit:
-
-- **Highlight** in five colours
-- **Note** — annotate a passage (re-openable by clicking the highlight)
-- **Translate** — opens a bottom sheet with the source, an auto-detected language, the
-  translation, and a one-tap **Save to vocabulary**
-
-Highlights and notes are anchored to character offsets within a paragraph, so they
-survive re-rendering and layout changes.
-
-### 4. The Vocabulary Bank (`/vocabulary`)
-Every translated term is captured with its meaning and **the exact sentence it came
-from**. Review, search, filter, and set a learning status (new / learning / known), then
-**export**:
-
-- **Anki** — tab-separated with `#`-header (Term / Translation / Context / Tags, HTML on)
-- **Quizlet** — term ⇥ definition
-- **CSV** — every field, for spreadsheets and backups
-
-### 5. The Study Organizer (`/study`)
-The academic half of Mero: what you have to read *by when*, next to the reading itself.
+## What it does
 
 - **Dashboard** (`/study`) — a completion ring over all tasks, tiles for open / due today /
   overdue / exams ahead, then today's tasks, today's lectures, and countdowns to upcoming
@@ -63,12 +22,15 @@ The academic half of Mero: what you have to read *by when*, next to the reading 
   deadline. Filter by type, status or course, search by text, and tick items off inline.
 - **Exams** (`/study/exams`) — exam dates per course, split into upcoming and past, counting
   down in days.
-
 - **Data** (`/study/data`) — export every profile to a JSON backup, restore one, or clear
   everything behind a typed confirmation.
 
 Deleting a course cascades to its lectures, tasks and exams. Every course is tinted, and that
-tint follows it onto the schedule grid, task rows and dashboard.
+tint follows it onto the schedule grid, task rows and dashboard. Theme (light / sepia / dark)
+and language sit in the top bar.
+
+`/` forwards to `/study`, and so does any unknown path. The routes keep the `/study` prefix so
+links already shared or bookmarked — and the host rewrite rules — keep working.
 
 ---
 
@@ -91,18 +53,12 @@ persisted with the rest of the settings. Choosing Arabic sets `dir="rtl"` and `l
   digits throughout, change `AR_LOCALE` in `src/i18n/index.ts` to `ar-u-nu-latn`.
 - **Layout** uses CSS logical properties (`margin-inline-start`, `border-inline-start`,
   `inset-inline-end`) rather than physical ones, so nothing needs a mirrored stylesheet.
-- **The Reader is pinned to `dir="ltr"`.** Paged mode lays text out in CSS columns and scrolls
-  them with `translateX`, with the ←/→ keys and tap zones wired to that axis; flipping it would
-  reverse the page-turn direction. The bundled texts are LTR anyway.
 
 `src/i18n/strings.ts` holds plain copy and `plurals.ts` the counted phrases. English is the
 source of truth in both: the Arabic table is typed as `Record<StringKey, string>`, so a missing
 or misspelled key fails `tsc` instead of rendering a key name to a student. Messages held in
 component state are stored **as keys, not resolved strings**, so an error already on screen
 re-renders in the new language when the toggle is used.
-
-Library and Vocabulary copy is still English only — translating the reading side was outside
-this work — but both mirror correctly under RTL.
 
 ---
 
@@ -183,7 +139,7 @@ uploaded.
 
 ### Why the `.htaccess` matters
 
-`/study`, `/study/courses` and `/read/<id>` exist only in the browser's router — there are no
+`/study` and `/study/courses` exist only in the browser's router — there are no
 such directories on disk. Without the rewrite in `public/.htaccess`, loading or refreshing one
 of those URLs directly, or opening a shared link, returns the host's 404 page instead of the
 app. The rewrite serves `index.html` for any path that is not a real file, while leaving
@@ -214,11 +170,7 @@ All data lives in `localStorage` on the device. Clearing site data, using privat
 switching machines loses it. Export a backup from **Study → Data** first; the same page
 restores one.
 
-Open the dev URL Vite prints. On first run, Mero seeds a small multilingual library
-(English, Spanish, French, German) so every feature is immediately explorable. All data
-(library, highlights, vocabulary, settings) is persisted to `localStorage`.
-
-The Study Organizer starts empty behind a profile picker — create a profile, or hit
+Open the dev URL Vite prints. Mero starts empty behind a profile picker — create a profile, or hit
 **Explore with sample data** for a populated semester whose deadlines are dated relative to
 today.
 
@@ -228,35 +180,26 @@ today.
 
 ```
 src/
-  types.ts                 Domain models (Book, Highlight, VocabularyEntry, Settings,
-                           Student, Course, Lecture, Task, Exam…)
+  types.ts                 Domain models (Student, Course, Lecture, Task, Exam, Settings)
   store/
-    useStore.ts            Reader store (library, highlights, vocabulary, settings)
-    useStudyStore.ts       Study store (profiles, courses, lectures, tasks, exams)
+    useStore.ts            Preferences (theme, interface language)
+    useStudyStore.ts       Profiles, courses, lectures, tasks, exams
   data/
-    seedBooks.ts           Starter library (original, multilingual texts)
     seedStudy.ts           Sample semester, dated relative to today
-    dictionary.ts          Bilingual word lists + idiom tables for the mock translator
   i18n/
     strings.ts             English + Arabic copy, keyed and type-checked
     plurals.ts             Counted phrases across the six CLDR plural categories
     index.ts               useI18n(): t / tn / number, date, weekday, countdown
   services/
-    translation.ts         Pluggable translation provider interface + offline mock
-    export.ts              Anki / Quizlet / CSV exporters + file download
     backup.ts              Study JSON backup: build, serialize, validate on import
   lib/
-    selection.ts           DOM selection → paragraph-relative character offsets
-    highlight.ts           Paragraph text → highlighted render segments
     date.ts                Calendar-date parsing, countdowns and weekday helpers
     courseColors.ts        Course tint palette
+    download.ts            Browser download for generated text
     format.ts, id.ts, toast.ts
   components/
-    Chrome, Toast, Icons
-    library/   Library, BookCard
-    reader/    Reader, Paragraph, SelectionToolkit, TranslationSheet,
-               SettingsPanel, HighlightPopover
-    vocabulary/Vocabulary
+    Chrome                 Top bar: brand, theme and language switchers
+    Toast, Icons
     study/     StudyLayout, Dashboard, Courses, Tasks, Exams, Data, SignIn, ui
 public/
   .htaccess                Apache: SPA rewrite, UTF-8, caching, dotfile deny
@@ -264,8 +207,9 @@ public/
 netlify.toml               Netlify build settings, redirects and headers
 ```
 
-The two stores persist under separate localStorage keys (`mero-store` and `mero-study`), so
-the reading side and the study side evolve independently.
+The two stores persist under separate localStorage keys: `mero-store` holds preferences and
+`mero-study` the coursework, so clearing study data from Study → Data never resets the theme
+or language.
 
 ### Dates
 
@@ -312,44 +256,7 @@ Real accounts need a server — session handling, hashed credentials (`password_
 bcrypt/argon2 elsewhere), and per-user queries. The store is the seam for that work: replace
 the action bodies in `useStudyStore.ts` with API calls and the components stay as they are.
 
-### Translation is pluggable
-
-The UI only ever talks to a `TranslationProvider`. The bundled `MockTranslationProvider`
-does an **offline, dictionary-driven gloss** (with language auto-detection and idiom
-lookups) so the full mining loop works with zero configuration.
-
-To wire a real backend (Claude, DeepL, a self-hosted model, …), implement the interface
-and register it once at startup — no component changes required:
-
-```ts
-import { setTranslationProvider, type TranslationProvider } from './services/translation'
-
-const claude: TranslationProvider = {
-  name: 'Claude',
-  async translate({ text, targetLanguage }) {
-    // call your API / proxy here
-    return { translation, detectedSourceLanguage, targetLanguage, notes }
-  },
-}
-
-setTranslationProvider(claude)
-```
-
-### Importing into Anki
-
-Export produces a `.txt` file with a modern Anki header. In Anki: **File → Import**, choose
-the file, confirm the field mapping (Term / Translation / Context), keep **Allow HTML in
-fields** enabled, and import.
-
----
-
 ## Roadmap
 
-The MVP intentionally mocks the AI layer and reads from a seeded library. Natural next
-steps: real AI translation/grammar notes, EPUB/PDF import, OCR, cloud sync, and direct
-spaced-repetition scheduling inside Mero.
-
-For the Study Organizer: a real authenticated backend (see above), then the features that
-only make sense once one exists — reminders and notifications, calendar (`.ics`) export,
-recurring tasks, and attaching a library text to a course so a reading assignment and the
-text itself are one click apart.
+A real authenticated backend (see above), then the features that only make sense once one
+exists — reminders and notifications, calendar (`.ics`) export, and recurring tasks.
